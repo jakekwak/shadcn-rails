@@ -2,6 +2,7 @@ Rails.application.routes.draw do
   # Define your application routes per the DSL in https://guides.rubyonrails.org/routing.html
 
   get "/examples/:example", to: "application#examples", as: :example
+  get "/blocks/:block", to: "application#block", as: :block_preview
   get "/docs/components/:component", to: "components#show", as: :component
   get "/docs/components", to: redirect("/docs/components/accordion")
   get "/components", to: redirect("/docs/components/accordion"), as: :components

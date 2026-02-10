@@ -24,12 +24,42 @@
       "app/helpers/components/alert_dialog_helper.rb",
       "app/views/components/ui/_alert_dialog.html.erb"
     ],
-    "dependencies": [{ "component": "dialog" }, "app/views/components/ui/shared/_backdrop.html.erb"]
+    "dependencies": [
+      {
+        "component": "dialog"
+      },
+      "app/views/components/ui/shared/_backdrop.html.erb"
+    ]
+  },
+  "avatar": {
+    "name": "avatar",
+    "type": "components:ui",
+    "files": [
+      "app/helpers/components/avatar_helper.rb"
+    ]
   },
   "badge": {
     "name": "badge",
     "type": "components:ui",
-    "files": ["app/helpers/components/badge_helper.rb"]
+    "files": [
+      "app/helpers/components/badge_helper.rb"
+    ]
+  },
+  "breadcrumb": {
+    "name": "breadcrumb",
+    "type": "components:ui",
+    "files": [
+      "app/helpers/components/breadcrumb_helper.rb",
+      "app/views/components/ui/_breadcrumb.html.erb"
+    ]
+  },
+  "button-group": {
+    "name": "button-group",
+    "type": "components:ui",
+    "files": [
+      "app/helpers/components/button_group_helper.rb",
+      "app/views/components/ui/_button_group.html.erb"
+    ]
   },
   "button": {
     "name": "button",
@@ -74,7 +104,14 @@
       "app/helpers/components/combobox_helper.rb",
       "app/views/components/ui/_combobox.html.erb"
     ],
-    "dependencies": [{ "component": "popover" }, { "component": "filter" }]
+    "dependencies": [
+      {
+        "component": "popover"
+      },
+      {
+        "component": "filter"
+      }
+    ]
   },
   "command": {
     "name": "command",
@@ -102,7 +139,9 @@
       "app/views/components/ui/_dialog.html.erb",
       "app/javascript/controllers/ui/dialog_controller.js"
     ],
-    "dependencies": ["app/views/components/ui/shared/_backdrop.html.erb"]
+    "dependencies": [
+      "app/views/components/ui/shared/_backdrop.html.erb"
+    ]
   },
   "dropdown-menu": {
     "name": "dropdown-menu",
@@ -113,8 +152,18 @@
       "app/javascript/controllers/ui/dropdown_controller.js"
     ],
     "dependencies": [
-      { "component": "popover" },
+      {
+        "component": "popover"
+      },
       "app/views/components/ui/shared/_menu_item.html.erb"
+    ]
+  },
+  "empty": {
+    "name": "empty",
+    "type": "components:ui",
+    "files": [
+      "app/helpers/components/empty_helper.rb",
+      "app/views/components/ui/_empty.html.erb"
     ]
   },
   "dropzone": {
@@ -138,12 +187,23 @@
   "forms": {
     "name": "forms",
     "type": "components:ui",
-    "files": ["app/helpers/components/forms_helper.rb", "app/components/shadcn/form_builder.rb"],
+    "files": [
+      "app/helpers/components/forms_helper.rb",
+      "app/components/shadcn/form_builder.rb"
+    ],
     "dependencies": [
-      { "component": "input" },
-      { "component": "label" },
-      { "component": "textarea" },
-      { "component": "button" }
+      {
+        "component": "input"
+      },
+      {
+        "component": "label"
+      },
+      {
+        "component": "textarea"
+      },
+      {
+        "component": "button"
+      }
     ]
   },
   "hover-card": {
@@ -155,6 +215,14 @@
       "app/javascript/controllers/ui/hover-card_controller.js"
     ]
   },
+  "item": {
+    "name": "item",
+    "type": "components:ui",
+    "files": [
+      "app/helpers/components/item_helper.rb",
+      "app/views/components/ui/_item.html.erb"
+    ]
+  },
   "input": {
     "name": "input",
     "type": "components:ui",
@@ -162,6 +230,13 @@
       "app/helpers/components/input_helper.rb",
       "app/views/components/ui/_input.html.erb",
       "app/javascript/controllers/ui/input_controller.js"
+    ]
+  },
+  "kbd": {
+    "name": "kbd",
+    "type": "components:ui",
+    "files": [
+      "app/helpers/components/kbd_helper.rb"
     ]
   },
   "label": {
@@ -213,9 +288,9 @@
     "name": "radio-group",
     "type": "components:ui",
     "files": [
-      "app/helpers/components/radio-group_helper.rb",
-      "app/views/components/ui/_radio-group.html.erb",
-      "app/javascript/controllers/ui/radio-group_controller.js"
+      "app/helpers/components/radio_group_helper.rb",
+      "app/views/components/ui/_radio_group.html.erb",
+      "app/javascript/controllers/ui/radio_group_controller.js"
     ]
   },
   "scroll-area": {
@@ -238,7 +313,16 @@
   "separator": {
     "name": "separator",
     "type": "components:ui",
-    "files": ["app/helpers/components/separator_helper.rb"]
+    "files": [
+      "app/helpers/components/separator_helper.rb"
+    ]
+  },
+  "spinner": {
+    "name": "spinner",
+    "type": "components:ui",
+    "files": [
+      "app/helpers/components/spinner_helper.rb"
+    ]
   },
   "sheet": {
     "name": "sheet",
@@ -325,6 +409,20 @@
       "app/javascript/controllers/ui/toggle_controller.js"
     ]
   },
+  "toggle-group": {
+    "name": "toggle-group",
+    "type": "components:ui",
+    "files": [
+      "app/helpers/components/toggle_group_helper.rb",
+      "app/views/components/ui/_toggle_group.html.erb",
+      "app/javascript/controllers/ui/toggle_group_controller.js"
+    ],
+    "dependencies": [
+      {
+        "component": "toggle"
+      }
+    ]
+  },
   "tooltip": {
     "name": "tooltip",
     "type": "components:ui",
@@ -332,6 +430,46 @@
       "app/helpers/components/tooltip_helper.rb",
       "app/views/components/ui/_tooltip.html.erb",
       "app/javascript/controllers/ui/tooltip_controller.js"
+    ]
+  },
+  "login-03": {
+    "name": "login-03",
+    "type": "components:block",
+    "files": [
+      "app/views/blocks/login_03/_login_03.html.erb",
+      "app/views/blocks/login_03/_login_form.html.erb"
+    ]
+  },
+  "login-01": {
+    "name": "login-01",
+    "type": "components:block",
+    "files": [
+      "app/views/blocks/login_01/_login_01.html.erb",
+      "app/views/blocks/login_01/_login_form.html.erb"
+    ]
+  },
+  "login-02": {
+    "name": "login-02",
+    "type": "components:block",
+    "files": [
+      "app/views/blocks/login_02/_login_02.html.erb",
+      "app/views/blocks/login_02/_login_form.html.erb"
+    ]
+  },
+  "login-04": {
+    "name": "login-04",
+    "type": "components:block",
+    "files": [
+      "app/views/blocks/login_04/_login_04.html.erb",
+      "app/views/blocks/login_04/_login_form.html.erb"
+    ]
+  },
+  "login-05": {
+    "name": "login-05",
+    "type": "components:block",
+    "files": [
+      "app/views/blocks/login_05/_login_05.html.erb",
+      "app/views/blocks/login_05/_login_form.html.erb"
     ]
   }
 }

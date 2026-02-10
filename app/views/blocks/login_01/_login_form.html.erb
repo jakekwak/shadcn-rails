@@ -1,0 +1,40 @@
+<div class="<%= tw("min-w-0 flex flex-col gap-6", local_assigns[:class]) %>">
+      <%= render_card(class: "w-full") do %>
+<div class="flex flex-col space-y-1.5 p-6">
+          <h3 class="font-semibold leading-none tracking-tight text-2xl">Login</h3>
+          <p class="text-sm text-muted-foreground">
+            Enter your email below to login to your account
+          </p>
+        </div>
+        <div class="p-6 pt-0">
+          <form>
+            <div class="flex flex-col gap-6">
+              <div class="grid gap-2">
+                <%= render_label(name: "email", label: "Email") %>
+                <%= render_input(type: "email", id: "email", placeholder: "m@example.com", required: true, name: "email") %>
+              </div>
+              <div class="grid gap-2">
+                <div class="flex items-center">
+                  <%= render_label(name: "password", label: "Password") %>
+                  <a
+                    href="#"
+                    class="ml-auto inline-block text-sm underline-offset-4 hover:underline"
+                  >
+                    Forgot your password?
+                  </a>
+                </div>
+                <%= render_input(type: "password", id: "password", required: true, name: "password") %>
+              </div>
+              <%= render_button("Login", class: "w-full", type: "submit") %>
+              <%= render_button("Login with Google", class: "w-full", variant: :outline) %>
+            </div>
+            <div class="mt-4 text-center text-sm">
+              Don't have an account? 
+              <a href="#" class="underline underline-offset-4">
+                Sign up
+              </a>
+            </div>
+          </form>
+        </div>
+<% end %>
+    </div>

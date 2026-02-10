@@ -1,0 +1,1025 @@
+#!/usr/bin/env python3
+"""
+shadcn_to_rails: Convert React shadcn/ui components, blocks, and templates to Rails ERB + Helper.
+
+Usage:
+    python bin/shadcn_to_rails <component-name> [options]
+
+Examples:
+    python bin/shadcn_to_rails login-03
+    python bin/shadcn_to_rails button
+    python bin/shadcn_to_rails --url https://ui.shadcn.com/r/styles/new-york/sidebar-01.json
+"""
+
+import argparse
+import json
+import os
+import re
+import sys
+import textwrap
+import urllib.request
+from pathlib import Path
+
+# ---------------------------------------------------------------------------
+# Constants
+# ---------------------------------------------------------------------------
+
+REGISTRY_BASE = "https://ui.shadcn.com/r/styles/new-york"
+PROJECT_ROOT = Path(__file__).resolve().parent.parent
+COMPONENTS_JSON = PROJECT_ROOT / "lib" / "components.json"
+
+# Known shadcn-rails helpers mapped from React component names
+COMPONENT_MAP = {
+    # Simple components: inline helper call
+    "Button": {"helper": "render_button", "text_arg": True, "block": True},
+    "Input": {"helper": "render_input", "self_closing": True, "required_props": {"name": "id"}},
+    "Label": {"helper": "render_label", "keyword_only": True, "required_props": {"name": "htmlFor", "label": "text_content"}},
+    "Badge": {"helper": "render_badge", "text_arg": True},
+    "Separator": {"helper": "render_separator", "self_closing": True},
+    "Checkbox": {"helper": "render_checkbox", "self_closing": True},
+    "Switch": {"helper": "render_switch", "self_closing": True},
+    "Textarea": {"helper": "render_textarea", "self_closing": True},
+    "Avatar": {"helper": "render_avatar", "self_closing": True},
+    "Spinner": {"helper": "render_spinner", "self_closing": True},
+    "Progress": {"helper": "render_progress", "self_closing": True},
+    "Toggle": {"helper": "render_toggle", "text_arg": True},
+    "Slider": {"helper": "render_slider", "self_closing": True},
+    "Skeleton": {"helper": "render_skeleton", "self_closing": True},
+    "ScrollArea": {"helper": "render_scroll_area", "block": True},
+    "Select": {"helper": "render_select", "self_closing": True},
+    # Block components: wrap with do...end
+    "Card": {"helper": "render_card", "block": True, "inject_class": "w-full"},
+    "Alert": {"helper": "render_alert", "block": True},
+    "Dialog": {"helper": "render_dialog", "block": True},
+    "Sheet": {"helper": "render_sheet", "block": True},
+    "Popover": {"helper": "render_popover", "block": True},
+    "Tooltip": {"helper": "render_tooltip", "block": True},
+    "HoverCard": {"helper": "render_hover_card", "block": True},
+    "Tabs": {"helper": "render_tabs", "block": True},
+    "Accordion": {"helper": "render_accordion", "block": True},
+    "Collapsible": {"helper": "render_collapsible", "block": True},
+    "DropdownMenu": {"helper": "render_dropdown_menu", "block": True},
+    "Table": {"helper": "render_table", "block": True},
+}
+
+# Sub-components mapped to plain HTML tags with Tailwind classes
+SUB_COMPONENT_MAP = {
+    "CardHeader": {"tag": "div", "class": "flex flex-col space-y-1.5 p-6"},
+    "CardTitle": {"tag": "h3", "class": "font-semibold leading-none tracking-tight"},
+    "CardDescription": {"tag": "p", "class": "text-sm text-muted-foreground"},
+    "CardContent": {"tag": "div", "class": "p-6 pt-0"},
+    "CardFooter": {"tag": "div", "class": "flex items-center p-6 pt-0"},
+    "AlertTitle": {"tag": "h5", "class": "mb-1 font-medium leading-none tracking-tight"},
+    "AlertDescription": {"tag": "div", "class": "text-sm [&_p]:leading-relaxed"},
+    "DialogHeader": {"tag": "div", "class": "flex flex-col space-y-1.5 text-center sm:text-left"},
+    "DialogFooter": {"tag": "div", "class": "flex flex-col-reverse sm:flex-row sm:justify-end sm:space-x-2"},
+    "DialogTitle": {"tag": "h2", "class": "text-lg font-semibold leading-none tracking-tight"},
+    "DialogDescription": {"tag": "p", "class": "text-sm text-muted-foreground"},
+    "DialogContent": {"tag": "div", "class": ""},
+    "DialogTrigger": {"tag": "button", "class": ""},
+    "DialogClose": {"tag": "button", "class": ""},
+    "SheetHeader": {"tag": "div", "class": "flex flex-col space-y-2 text-center sm:text-left"},
+    "SheetFooter": {"tag": "div", "class": "flex flex-col-reverse sm:flex-row sm:justify-end sm:space-x-2"},
+    "SheetTitle": {"tag": "h2", "class": "text-lg font-semibold text-foreground"},
+    "SheetDescription": {"tag": "p", "class": "text-sm text-muted-foreground"},
+    "SheetContent": {"tag": "div", "class": ""},
+    "SheetTrigger": {"tag": "button", "class": ""},
+    "SheetClose": {"tag": "button", "class": ""},
+    "TabsList": {"tag": "div", "class": "inline-flex h-10 items-center justify-center rounded-md bg-muted p-1 text-muted-foreground"},
+    "TabsTrigger": {"tag": "button", "class": "inline-flex items-center justify-center whitespace-nowrap rounded-sm px-3 py-1.5 text-sm font-medium"},
+    "TabsContent": {"tag": "div", "class": "mt-2"},
+    "TableHeader": {"tag": "thead", "class": "[&_tr]:border-b"},
+    "TableBody": {"tag": "tbody", "class": "[&_tr:last-child]:border-0"},
+    "TableFooter": {"tag": "tfoot", "class": "border-t bg-muted/50 font-medium [&>tr]:last:border-b-0"},
+    "TableRow": {"tag": "tr", "class": "border-b transition-colors hover:bg-muted/50 data-[state=selected]:bg-muted"},
+    "TableHead": {"tag": "th", "class": "h-12 px-4 text-left align-middle font-medium text-muted-foreground"},
+    "TableCell": {"tag": "td", "class": "p-4 align-middle"},
+    "TableCaption": {"tag": "caption", "class": "mt-4 text-sm text-muted-foreground"},
+    "AccordionItem": {"tag": "div", "class": "border-b"},
+    "AccordionTrigger": {"tag": "button", "class": "flex flex-1 items-center justify-between py-4 font-medium"},
+    "AccordionContent": {"tag": "div", "class": "overflow-hidden text-sm transition-all"},
+    "SelectTrigger": {"tag": "button", "class": "flex h-10 w-full items-center justify-between rounded-md border border-input bg-background px-3 py-2 text-sm"},
+    "SelectContent": {"tag": "div", "class": ""},
+    "SelectItem": {"tag": "option", "class": ""},
+    "SelectValue": {"tag": "span", "class": ""},
+    "SelectGroup": {"tag": "div", "class": ""},
+    "SelectLabel": {"tag": "label", "class": "py-1.5 pl-8 pr-2 text-sm font-semibold"},
+    "SelectSeparator": {"tag": "hr", "class": "-mx-1 my-1 h-px bg-muted"},
+    "DropdownMenuTrigger": {"tag": "button", "class": ""},
+    "DropdownMenuContent": {"tag": "div", "class": "z-50 min-w-[8rem] overflow-hidden rounded-md border bg-popover p-1 text-popover-foreground shadow-md"},
+    "DropdownMenuItem": {"tag": "div", "class": "relative flex cursor-default select-none items-center rounded-sm px-2 py-1.5 text-sm outline-none"},
+    "DropdownMenuLabel": {"tag": "div", "class": "px-2 py-1.5 text-sm font-semibold"},
+    "DropdownMenuSeparator": {"tag": "hr", "class": "-mx-1 my-1 h-px bg-muted"},
+    "DropdownMenuGroup": {"tag": "div", "class": ""},
+    "DropdownMenuSub": {"tag": "div", "class": ""},
+    "DropdownMenuSubTrigger": {"tag": "div", "class": "flex cursor-default select-none items-center rounded-sm px-2 py-1.5 text-sm outline-none"},
+    "DropdownMenuSubContent": {"tag": "div", "class": "z-50 min-w-[8rem] overflow-hidden rounded-md border bg-popover p-1 text-popover-foreground shadow-md"},
+    "DropdownMenuCheckboxItem": {"tag": "div", "class": "relative flex cursor-default select-none items-center rounded-sm py-1.5 pl-8 pr-2 text-sm outline-none"},
+    "DropdownMenuRadioGroup": {"tag": "div", "class": ""},
+    "DropdownMenuRadioItem": {"tag": "div", "class": "relative flex cursor-default select-none items-center rounded-sm py-1.5 pl-8 pr-2 text-sm outline-none"},
+    "DropdownMenuShortcut": {"tag": "span", "class": "ml-auto text-xs tracking-widest opacity-60"},
+    "PopoverTrigger": {"tag": "button", "class": ""},
+    "PopoverContent": {"tag": "div", "class": "z-50 w-72 rounded-md border bg-popover p-4 text-popover-foreground shadow-md outline-none"},
+    "TooltipProvider": {"tag": "div", "class": "", "unwrap": True},
+    "TooltipTrigger": {"tag": "span", "class": ""},
+    "TooltipContent": {"tag": "div", "class": "z-50 overflow-hidden rounded-md border bg-popover px-3 py-1.5 text-sm text-popover-foreground shadow-md"},
+    "ScrollBar": {"tag": "div", "class": ""},
+    "NavigationMenu": {"tag": "nav", "class": ""},
+    "NavigationMenuList": {"tag": "ul", "class": ""},
+    "NavigationMenuItem": {"tag": "li", "class": ""},
+    "NavigationMenuLink": {"tag": "a", "class": ""},
+    "NavigationMenuTrigger": {"tag": "button", "class": ""},
+    "NavigationMenuContent": {"tag": "div", "class": ""},
+    "FormField": {"tag": "div", "class": "space-y-2"},
+    "FormItem": {"tag": "div", "class": "space-y-2"},
+    "FormLabel": {"tag": "label", "class": "text-sm font-medium leading-none"},
+    "FormControl": {"tag": "div", "class": "", "unwrap": True},
+    "FormDescription": {"tag": "p", "class": "text-sm text-muted-foreground"},
+    "FormMessage": {"tag": "p", "class": "text-sm font-medium text-destructive"},
+}
+
+# JSX attribute name → HTML attribute name
+ATTR_MAP = {
+    "className": "class",
+    "htmlFor": "for",
+    "tabIndex": "tabindex",
+    "autoFocus": "autofocus",
+    "autoComplete": "autocomplete",
+    "readOnly": "readonly",
+    "maxLength": "maxlength",
+    "minLength": "minlength",
+    "noValidate": "novalidate",
+    "crossOrigin": "crossorigin",
+    "formAction": "formaction",
+    "formMethod": "formmethod",
+    "formNoValidate": "formnovalidate",
+    "formTarget": "formtarget",
+    "inputMode": "inputmode",
+    "spellCheck": "spellcheck",
+    "srcSet": "srcset",
+    "useMap": "usemap",
+    "accessKey": "accesskey",
+    "contentEditable": "contenteditable",
+    "contextMenu": "contextmenu",
+    "encType": "enctype",
+    "acceptCharset": "accept-charset",
+    "httpEquiv": "http-equiv",
+    "cellPadding": "cellpadding",
+    "cellSpacing": "cellspacing",
+    "colSpan": "colspan",
+    "rowSpan": "rowspan",
+    "frameBorder": "frameborder",
+}
+
+# Common Lucide icons → simple SVG or placeholder
+LUCIDE_ICONS = {
+    "Check": '<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="size-4"><path d="M20 6 9 17l-5-5"/></svg>',
+    "ChevronDown": '<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="size-4"><path d="m6 9 6 6 6-6"/></svg>',
+    "ChevronRight": '<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="size-4"><path d="m9 18 6-6-6-6"/></svg>',
+    "ChevronLeft": '<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="size-4"><path d="m15 18-6-6 6-6"/></svg>',
+    "ChevronUp": '<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="size-4"><path d="m18 15-6-6-6 6"/></svg>',
+    "X": '<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="size-4"><path d="M18 6 6 18"/><path d="m6 6 12 12"/></svg>',
+    "Search": '<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="size-4"><circle cx="11" cy="11" r="8"/><path d="m21 21-4.3-4.3"/></svg>',
+    "Plus": '<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="size-4"><path d="M5 12h14"/><path d="M12 5v14"/></svg>',
+    "Minus": '<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="size-4"><path d="M5 12h14"/></svg>',
+    "Eye": '<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="size-4"><path d="M2.062 12.348a1 1 0 0 1 0-.696 10.75 10.75 0 0 1 19.876 0 1 1 0 0 1 0 .696 10.75 10.75 0 0 1-19.876 0"/><circle cx="12" cy="12" r="3"/></svg>',
+    "EyeOff": '<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="size-4"><path d="M10.733 5.076a10.744 10.744 0 0 1 11.205 6.575 1 1 0 0 1 0 .696 10.747 10.747 0 0 1-1.444 2.49"/><path d="M14.084 14.158a3 3 0 0 1-4.242-4.242"/><path d="M17.479 17.499a10.75 10.75 0 0 1-15.417-5.151 1 1 0 0 1 0-.696 10.75 10.75 0 0 1 4.446-5.143"/><path d="m2 2 20 20"/></svg>',
+    "Moon": '<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="size-4"><path d="M12 3a6 6 0 0 0 9 9 9 9 0 1 1-9-9Z"/></svg>',
+    "Sun": '<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="size-4"><circle cx="12" cy="12" r="4"/><path d="M12 2v2"/><path d="M12 20v2"/><path d="m4.93 4.93 1.41 1.41"/><path d="m17.66 17.66 1.41 1.41"/><path d="M2 12h2"/><path d="M20 12h2"/><path d="m6.34 17.66-1.41 1.41"/><path d="m19.07 4.93-1.41 1.41"/></svg>',
+    "Menu": '<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="size-4"><line x1="4" x2="20" y1="12" y2="12"/><line x1="4" x2="20" y1="6" y2="6"/><line x1="4" x2="20" y1="18" y2="18"/></svg>',
+    "ArrowRight": '<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="size-4"><path d="M5 12h14"/><path d="m12 5 7 7-7 7"/></svg>',
+    "ArrowLeft": '<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="size-4"><path d="m12 19-7-7 7-7"/><path d="M19 12H5"/></svg>',
+    "Loader2": '<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="size-4 animate-spin"><path d="M21 12a9 9 0 1 1-6.219-8.56"/></svg>',
+    "Mail": '<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="size-4"><rect width="20" height="16" x="2" y="4" rx="2"/><path d="m22 7-8.97 5.7a1.94 1.94 0 0 1-2.06 0L2 7"/></svg>',
+    "User": '<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="size-4"><path d="M19 21v-2a4 4 0 0 0-4-4H9a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg>',
+    "Settings": '<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="size-4"><path d="M12.22 2h-.44a2 2 0 0 0-2 2v.18a2 2 0 0 1-1 1.73l-.43.25a2 2 0 0 1-2 0l-.15-.08a2 2 0 0 0-2.73.73l-.22.38a2 2 0 0 0 .73 2.73l.15.1a2 2 0 0 1 1 1.72v.51a2 2 0 0 1-1 1.74l-.15.09a2 2 0 0 0-.73 2.73l.22.38a2 2 0 0 0 2.73.73l.15-.08a2 2 0 0 1 2 0l.43.25a2 2 0 0 1 1 1.73V20a2 2 0 0 0 2 2h.44a2 2 0 0 0 2-2v-.18a2 2 0 0 1 1-1.73l.43-.25a2 2 0 0 1 2 0l.15.08a2 2 0 0 0 2.73-.73l.22-.39a2 2 0 0 0-.73-2.73l-.15-.08a2 2 0 0 1-1-1.74v-.5a2 2 0 0 1 1-1.74l.15-.09a2 2 0 0 0 .73-2.73l-.22-.38a2 2 0 0 0-2.73-.73l-.15.08a2 2 0 0 1-2 0l-.43-.25a2 2 0 0 1-1-1.73V4a2 2 0 0 0-2-2z"/><circle cx="12" cy="12" r="3"/></svg>',
+    "Home": '<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="size-4"><path d="m3 9 9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/><polyline points="9 22 9 12 15 12 15 22"/></svg>',
+    "Star": '<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="size-4"><polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"/></svg>',
+    "Trash": '<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="size-4"><path d="M3 6h18"/><path d="M19 6v14c0 1-1 2-2 2H7c-1 0-2-1-2-2V6"/><path d="M8 6V4c0-1 1-2 2-2h4c1 0 2 1 2 2v2"/></svg>',
+    "GalleryVerticalEnd": '<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="size-4"><path d="M7 2h10"/><path d="M5 6h14"/><rect width="18" height="12" x="3" y="10" rx="2"/></svg>',
+    "CircleAlert": '<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="size-4"><circle cx="12" cy="12" r="10"/><line x1="12" x2="12" y1="8" y2="12"/><line x1="12" x2="12.01" y1="16" y2="16"/></svg>',
+}
+
+
+# ---------------------------------------------------------------------------
+# Fetcher
+# ---------------------------------------------------------------------------
+
+def fetch_registry(name, style="new-york", url=None):
+    """Fetch component/block data from shadcn registry."""
+    target_url = url or f"{REGISTRY_BASE}/{name}.json"
+    print(f"  Fetching: {target_url}")
+    req = urllib.request.Request(target_url, headers={"User-Agent": "shadcn-to-rails/1.0"})
+    try:
+        with urllib.request.urlopen(req) as resp:
+            return json.loads(resp.read().decode())
+    except urllib.error.HTTPError as e:
+        print(f"  ERROR: HTTP {e.code} for {target_url}")
+        return None
+    except Exception as e:
+        print(f"  ERROR: {e}")
+        return None
+
+
+def load_existing_components():
+    """Load existing components from components.json."""
+    if COMPONENTS_JSON.exists():
+        with open(COMPONENTS_JSON) as f:
+            return json.load(f)
+    return {}
+
+
+def resolve_dependencies(data, existing):
+    """Check which registry dependencies are missing."""
+    deps = data.get("registryDependencies", [])
+    missing = []
+    for dep in deps:
+        if dep not in existing:
+            missing.append(dep)
+    return missing
+
+
+# ---------------------------------------------------------------------------
+# Parser
+# ---------------------------------------------------------------------------
+
+def extract_imports(tsx_content):
+    """Extract import statements and build icon/component maps."""
+    icons = set()
+    components = {}
+
+    for match in re.finditer(
+        r'import\s+\{([^}]+)\}\s+from\s+["\']([^"\']+)["\']', tsx_content
+    ):
+        names = [n.strip() for n in match.group(1).split(",") if n.strip()]
+        source = match.group(2)
+
+        if "lucide-react" in source:
+            icons.update(names)
+        else:
+            for name in names:
+                components[name] = source
+
+    return {"icons": icons, "components": components}
+
+
+def extract_jsx_body(tsx_content):
+    """Extract the JSX return body from a TSX component."""
+    # Try to find: return ( ... )
+    # Use a bracket-matching approach
+    match = re.search(r'\breturn\s*\(', tsx_content)
+    if not match:
+        # Try: return <...
+        match = re.search(r'\breturn\s*(<)', tsx_content)
+        if not match:
+            return tsx_content
+
+    start = match.end()
+    if tsx_content[start - 1] == '(':
+        # Find matching closing paren
+        depth = 1
+        pos = start
+        while pos < len(tsx_content) and depth > 0:
+            ch = tsx_content[pos]
+            if ch == '(':
+                depth += 1
+            elif ch == ')':
+                depth -= 1
+            elif ch in ('"', "'", '`'):
+                # Skip strings
+                quote = ch
+                pos += 1
+                while pos < len(tsx_content) and tsx_content[pos] != quote:
+                    if tsx_content[pos] == '\\':
+                        pos += 1
+                    pos += 1
+            pos += 1
+        return tsx_content[start:pos - 1].strip()
+    else:
+        # return <tag>...</tag> — find the end
+        return tsx_content[start - 1:].strip()
+
+
+# ---------------------------------------------------------------------------
+# Transformer
+# ---------------------------------------------------------------------------
+
+def transform_jsx_to_erb(jsx, icons=None, partial_prefix=""):
+    """Transform JSX to ERB markup.
+
+    partial_prefix: e.g. "blocks/login_03/" for block sub-component paths
+    """
+    if icons is None:
+        icons = set()
+
+    result = jsx
+
+    # 1. Remove React-specific imports and exports
+    result = re.sub(r'^\s*import\s+.*$', '', result, flags=re.MULTILINE)
+    result = re.sub(r'^\s*export\s+(default\s+)?', '', result, flags=re.MULTILINE)
+
+    # 2. Replace {" "} with a space
+    result = result.replace('{" "}', ' ')
+
+    # 3. Replace &apos; → '
+    result = result.replace("&apos;", "'")
+
+    # 4. Replace JSX comments {/* ... */}
+    result = re.sub(r'\{/\*.*?\*/\}', lambda m: f'<%# {m.group(0)[3:-3].strip()} %>', result, flags=re.DOTALL)
+
+    # 5. Handle Lucide icons - self-closing: <IconName className="..." />
+    def replace_icon(m):
+        icon_name = m.group(1)
+        attrs_str = m.group(2) or ""
+        # Extract className if any
+        cls_match = re.search(r'className="([^"]*)"', attrs_str)
+        icon_class = cls_match.group(1) if cls_match else "size-4"
+
+        if icon_name in LUCIDE_ICONS:
+            svg = LUCIDE_ICONS[icon_name]
+            # Update the class
+            svg = re.sub(r'class="[^"]*"', f'class="{icon_class}"', svg)
+            return svg
+        else:
+            return f'<!-- TODO: Lucide icon "{icon_name}" class="{icon_class}" -->'
+
+    for icon_name in icons:
+        # Self-closing icon tags
+        pattern = rf'<({re.escape(icon_name)})\s*((?:[^>]*?))\s*/>'
+        result = re.sub(pattern, replace_icon, result)
+
+    # 6. Handle known components (COMPONENT_MAP)
+    result = transform_known_components(result)
+
+    # 7. Handle sub-components (SUB_COMPONENT_MAP)
+    result = transform_sub_components(result)
+
+    # 8. Transform JSX attributes to HTML
+    result = transform_attributes(result)
+
+    # 9. Handle remaining JSX expressions
+    result = transform_jsx_expressions(result)
+
+    # 10. Handle unknown PascalCase component tags as partial renders
+    def replace_unknown_component_self_closing(m):
+        comp = m.group(1)
+        attrs = m.group(2) or ""
+        partial_name = camel_to_snake(comp).replace("-", "_")
+        return f'<%= render "{partial_prefix}{partial_name}" %>'
+
+    def replace_unknown_component_block(m):
+        comp = m.group(1)
+        attrs = m.group(2) or ""
+        children = m.group(3) or ""
+        partial_name = camel_to_snake(comp).replace("-", "_")
+        return f'<%= render "{partial_prefix}{partial_name}" do %>\n{children.strip()}\n<% end %>'
+
+    # Self-closing unknown components
+    result = re.sub(r'<([A-Z][a-zA-Z0-9]+)\s*((?:[^>]*?))\s*/>', replace_unknown_component_self_closing, result)
+    # Block unknown components
+    result = re.sub(r'<([A-Z][a-zA-Z0-9]+)(\s[^>]*)?>(((?!<\1[\s>]).){0,20000}?)</\1>', replace_unknown_component_block, result, flags=re.DOTALL)
+
+    # 10. Clean up self-closing HTML tags for non-void elements
+    void_elements = {'area', 'base', 'br', 'col', 'embed', 'hr', 'img', 'input',
+                     'link', 'meta', 'param', 'source', 'track', 'wbr'}
+    def fix_self_closing(m):
+        tag = m.group(1)
+        attrs = m.group(2) or ""
+        if tag.lower() in void_elements:
+            return f'<{tag}{attrs} />'
+        return f'<{tag}{attrs}></{tag}>'
+    result = re.sub(r'<([a-z][a-zA-Z0-9]*)((?:\s+[^>]*?)?)\s*/>', fix_self_closing, result)
+
+    # 11. Add size-4 class to inline SVGs that have no class attribute
+    def add_svg_size(m):
+        attrs = m.group(1)
+        if 'class=' not in attrs:
+            return f'<svg{attrs} class="size-4">'
+        return m.group(0)
+    result = re.sub(r'<svg([^>]*)>', add_svg_size, result)
+
+    # 12. Convert div with text-balance to p tag for proper text wrapping
+    # Only match div tags whose content has no nested divs (leaf-level text containers)
+    def convert_text_balance_div(m):
+        attrs = m.group(1)
+        content = m.group(2)
+        # Only convert if content has no nested div tags
+        if '<div' not in content:
+            return f'<p{attrs}>{content}</p>'
+        return m.group(0)
+    result = re.sub(r'<div(\s[^>]*text-balance[^>]*)>(.*?)</div>', convert_text_balance_div, result, flags=re.DOTALL)
+
+    # 13. Add min-w-0 to top-level flex containers using tw() to prevent overflow
+    result = re.sub(
+        r'class="<%= tw\("(flex\s)',
+        r'class="<%= tw("min-w-0 \1',
+        result
+    )
+
+    # 14. Clean up excessive blank lines
+    result = re.sub(r'\n{3,}', '\n\n', result)
+
+    return result.strip()
+
+
+def transform_known_components(jsx):
+    """Replace known React components with Rails helper calls."""
+    result = jsx
+
+    for comp_name, config in COMPONENT_MAP.items():
+        helper = config["helper"]
+        is_block = config.get("block", False)
+        is_self_closing = config.get("self_closing", False)
+        text_arg = config.get("text_arg", False)
+
+        def _apply_inject_class(props, _config):
+            """Merge inject_class into the class prop."""
+            inject = _config.get("inject_class")
+            if inject:
+                if "class" in props:
+                    # Merge: strip quotes, combine, re-quote
+                    existing = props["class"].strip('"')
+                    props["class"] = f'"{inject} {existing}"'
+                else:
+                    props["class"] = f'"{inject}"'
+
+        # Self-closing: <Component prop="val" />
+        def replace_self_closing(m, _helper=helper, _config=config):
+            attrs = m.group(1) or ""
+            props = parse_jsx_attrs(attrs, _config.get("props", {}))
+            _apply_inject_class(props, _config)
+            # Handle required_props mapping (e.g. name: derived from id attr)
+            required = _config.get("required_props", {})
+            for ruby_key, source in required.items():
+                if ruby_key not in props:
+                    if source == "text_content":
+                        props[ruby_key] = '""'
+                    elif source in ("id", "htmlFor"):
+                        # Try to get from existing parsed props or raw attrs
+                        val = _extract_attr_value(attrs, source)
+                        if val:
+                            props[ruby_key] = f'"{val}"'
+                        else:
+                            props[ruby_key] = '""'
+            props_str = format_ruby_props(props)
+            return f'<%= {_helper}({props_str}) %>'
+
+        result = re.sub(
+            rf'<{re.escape(comp_name)}\s*((?:[^>]*?))\s*/>',
+            replace_self_closing, result
+        )
+
+        # keyword_only: match block tags but render as keyword-only helper call (no block, no positional)
+        keyword_only = config.get("keyword_only", False)
+        if keyword_only:
+            def replace_keyword_only_block(m, _helper=helper, _config=config):
+                attrs = m.group(1) or ""
+                children = m.group(2) or ""
+                props = parse_jsx_attrs(attrs, _config.get("props", {}))
+                required = _config.get("required_props", {})
+                for ruby_key, source in required.items():
+                    if ruby_key not in props:
+                        if source == "text_content":
+                            clean = re.sub(r'<[^>]*>', '', children).strip()
+                            clean = re.sub(r'\{[^}]*\}', '', clean).strip()
+                            props[ruby_key] = f'"{clean}"' if clean else '""'
+                        elif source in ("id", "htmlFor"):
+                            val = _extract_attr_value(attrs, source)
+                            if val:
+                                props[ruby_key] = f'"{val}"'
+                props_str = format_ruby_props(props)
+                return f'<%= {_helper}({props_str}) %>'
+
+            pattern = rf'<{re.escape(comp_name)}(\s[^>]*)?>(((?!<{re.escape(comp_name)}[\s>]).){{0,20000}}?)</{re.escape(comp_name)}>'
+            result = re.sub(pattern, replace_keyword_only_block, result, flags=re.DOTALL)
+
+        if is_block or text_arg:
+            # Opening + closing tags with content: <Component props>...children...</Component>
+            def replace_block(m, _helper=helper, _config=config, _text_arg=text_arg):
+                attrs = m.group(1) or ""
+                children = m.group(2) or ""
+                props = parse_jsx_attrs(attrs, _config.get("props", {}))
+                _apply_inject_class(props, _config)
+                # Apply default_props if not already set
+                for k, v in _config.get("default_props", {}).items():
+                    if k not in props:
+                        props[k] = v
+                children = children.strip()
+
+                # Handle required_props
+                required = _config.get("required_props", {})
+                for ruby_key, source in required.items():
+                    if ruby_key not in props:
+                        if source == "text_content":
+                            # Use children text as value
+                            clean = re.sub(r'<[^>]*>', '', children).strip()
+                            clean = re.sub(r'\{[^}]*\}', '', clean).strip()
+                            props[ruby_key] = f'"{clean}"' if clean else '""'
+                        elif source in ("id", "htmlFor"):
+                            val = _extract_attr_value(attrs, source)
+                            if val:
+                                props[ruby_key] = f'"{val}"'
+
+                props_str = format_ruby_props(props)
+
+                # If children is simple text and component accepts text_arg
+                if _text_arg and not re.search(r'<[a-zA-Z]', children):
+                    clean_text = children.strip()
+                    clean_text = re.sub(r'\{[^}]*\}', '', clean_text).strip()
+                    if clean_text:
+                        text_escaped = clean_text.replace('"', '\\"')
+                        if props_str:
+                            return f'<%= {_helper}("{text_escaped}", {props_str}) %>'
+                        return f'<%= {_helper}("{text_escaped}") %>'
+
+                if props_str:
+                    return f'<%= {_helper}({props_str}) do %>\n{children}\n<% end %>'
+                return f'<%= {_helper} do %>\n{children}\n<% end %>'
+
+            # Match opening/closing tags (non-greedy, handling nesting approximately)
+            pattern = rf'<{re.escape(comp_name)}(\s[^>]*)?>(((?!<{re.escape(comp_name)}[\s>]).){{0,20000}}?)</{re.escape(comp_name)}>'
+            result = re.sub(pattern, replace_block, result, flags=re.DOTALL)
+
+    return result
+
+
+def transform_sub_components(jsx):
+    """Replace sub-components with HTML tags + Tailwind classes."""
+    result = jsx
+
+    # Sort by length (longest first) to handle e.g. CardHeader before Card
+    sorted_subs = sorted(SUB_COMPONENT_MAP.keys(), key=len, reverse=True)
+
+    for comp_name in sorted_subs:
+        config = SUB_COMPONENT_MAP[comp_name]
+        tag = config["tag"]
+        default_class = config.get("class", "")
+        unwrap = config.get("unwrap", False)
+
+        # Self-closing: <SubComponent ... />
+        def replace_self_closing_sub(m, _tag=tag, _default_class=default_class, _unwrap=unwrap):
+            attrs = m.group(1) or ""
+            if _unwrap:
+                return ""
+            cls = extract_classname(attrs)
+            merged = merge_classes(_default_class, cls)
+            other_attrs = remove_classname_attr(attrs)
+            if merged:
+                return f'<{_tag} class="{merged}"{other_attrs} />' if _tag in ('hr', 'br', 'img', 'input') else f'<{_tag} class="{merged}"{other_attrs}></{_tag}>'
+            return f'<{_tag}{other_attrs} />' if _tag in ('hr', 'br', 'img', 'input') else f'<{_tag}{other_attrs}></{_tag}>'
+
+        result = re.sub(
+            rf'<{re.escape(comp_name)}\s*((?:[^>]*?))\s*/>',
+            replace_self_closing_sub, result
+        )
+
+        # Opening/closing: <SubComponent ...>children</SubComponent>
+        def replace_block_sub(m, _tag=tag, _default_class=default_class, _unwrap=unwrap):
+            attrs = m.group(1) or ""
+            children = m.group(2) or ""
+            if _unwrap:
+                return children.strip()
+            cls = extract_classname(attrs)
+            merged = merge_classes(_default_class, cls)
+            other_attrs = remove_classname_attr(attrs)
+            if merged:
+                return f'<{_tag} class="{merged}"{other_attrs}>{children}</{_tag}>'
+            return f'<{_tag}{other_attrs}>{children}</{_tag}>'
+
+        pattern = rf'<{re.escape(comp_name)}(\s[^>]*)?>(((?!<{re.escape(comp_name)}[\s>]).){{0,20000}}?)</{re.escape(comp_name)}>'
+        result = re.sub(pattern, replace_block_sub, result, flags=re.DOTALL)
+
+    return result
+
+
+def transform_attributes(jsx):
+    """Transform JSX attributes to HTML attributes."""
+    result = jsx
+
+    # className="..." → class="..."
+    result = result.replace('className=', 'class=')
+
+    # className={cn("a", "b")} → class="a b"  (simplified)
+    def replace_cn_call(m):
+        args = m.group(1)
+        # Extract string literals
+        strings = re.findall(r'"([^"]*)"', args)
+        # Check for variable references
+        has_vars = bool(re.search(r'\b[a-z]\w*\b', re.sub(r'"[^"]*"', '', args)))
+        merged = " ".join(strings)
+        if has_vars:
+            return f'class="<%= tw("{merged}", local_assigns[:class]) %>"'
+        return f'class="{merged}"'
+
+    result = re.sub(r'class=\{cn\(([^)]+)\)\}', replace_cn_call, result)
+
+    # Other JSX attribute → HTML attribute renames
+    for jsx_attr, html_attr in ATTR_MAP.items():
+        if jsx_attr == "className":
+            continue  # Already handled
+        result = re.sub(rf'\b{re.escape(jsx_attr)}=', f'{html_attr}=', result)
+
+    # Boolean JSX attributes: {true} → just the attribute, {false} → remove
+    result = re.sub(r'(\w+)=\{true\}', r'\1', result)
+    result = re.sub(r'\s+\w+=\{false\}', '', result)
+
+    # Numeric JSX attributes: tabindex={0} → tabindex="0"
+    result = re.sub(r'(\w+)=\{(\d+)\}', r'\1="\2"', result)
+
+    # Remove {...props} spread
+    result = re.sub(r'\s*\{\.\.\.(?:props|rest)\}', '', result)
+
+    # Remove React ref attributes
+    result = re.sub(r'\s+ref=\{[^}]*\}', '', result)
+
+    # Remove React event handlers: onClick={...} etc
+    result = re.sub(r'\s+on[A-Z]\w+=\{[^}]*\}', '', result)
+
+    return result
+
+
+def transform_jsx_expressions(jsx):
+    """Handle remaining JSX expressions { ... }."""
+    result = jsx
+
+    # {variable} → <%= variable %> (simple variables, but skip objects/functions)
+    def replace_expression(m):
+        expr = m.group(1).strip()
+        # Skip if it looks like an object literal, function, or complex expression
+        if expr.startswith('{') or expr.startswith('(') or '=>' in expr:
+            return f'<%# TODO: {expr} %>'
+        if expr.startswith('...'):
+            return ''  # Spread, already handled
+        if expr.startswith('/*'):
+            return f'<%# {expr.strip("/* */")} %>'
+        # Simple string interpolation
+        return f'<%= {expr} %>'
+
+    # Be careful not to match already-converted ERB tags or HTML attributes
+    # Only match { } that are not inside HTML attribute values
+    result = re.sub(r'(?<!=)\{([^{}]+)\}', replace_expression, result)
+
+    return result
+
+
+# ---------------------------------------------------------------------------
+# Attribute Helpers
+# ---------------------------------------------------------------------------
+
+def _extract_attr_value(attrs_str, attr_name):
+    """Extract a raw attribute value from a JSX attributes string."""
+    m = re.search(rf'{re.escape(attr_name)}="([^"]*)"', attrs_str)
+    if m:
+        return m.group(1)
+    # Also try HTML-style name (e.g. htmlFor → for, id → id)
+    html_name = ATTR_MAP.get(attr_name, attr_name)
+    if html_name != attr_name:
+        m = re.search(rf'{re.escape(html_name)}="([^"]*)"', attrs_str)
+        if m:
+            return m.group(1)
+    return None
+
+
+def parse_jsx_attrs(attrs_str, prop_map=None):
+    """Parse JSX attributes into a dict of Ruby-compatible props."""
+    if prop_map is None:
+        prop_map = {}
+    props = {}
+
+    # className="..."
+    cls_match = re.search(r'class(?:Name)?="([^"]*)"', attrs_str)
+    if cls_match:
+        props["class"] = f'"{cls_match.group(1)}"'
+
+    # className={cn(...)}
+    cn_match = re.search(r'class(?:Name)?=\{cn\(([^)]+)\)\}', attrs_str)
+    if cn_match:
+        strings = re.findall(r'"([^"]*)"', cn_match.group(1))
+        props["class"] = f'"{" ".join(strings)}"'
+
+    # variant="..."
+    variant_match = re.search(r'variant="([^"]*)"', attrs_str)
+    if variant_match:
+        props["variant"] = f":{variant_match.group(1)}"
+
+    # size="..."
+    size_match = re.search(r'size="([^"]*)"', attrs_str)
+    if size_match:
+        props["size"] = f":{size_match.group(1)}"
+
+    # type="..."
+    type_match = re.search(r'type="([^"]*)"', attrs_str)
+    if type_match:
+        props["type"] = f'"{type_match.group(1)}"'
+
+    # id="..."
+    id_match = re.search(r'id="([^"]*)"', attrs_str)
+    if id_match:
+        props["id"] = f'"{id_match.group(1)}"'
+
+    # placeholder="..."
+    ph_match = re.search(r'placeholder="([^"]*)"', attrs_str)
+    if ph_match:
+        props["placeholder"] = f'"{ph_match.group(1)}"'
+
+    # required (boolean)
+    if re.search(r'\brequired\b', attrs_str):
+        props["required"] = "true"
+
+    # disabled (boolean)
+    if re.search(r'\bdisabled\b', attrs_str):
+        props["disabled"] = "true"
+
+    # asChild → skip (React-specific)
+
+    # Apply prop_map renames
+    for jsx_name, html_name in prop_map.items():
+        match = re.search(rf'{re.escape(jsx_name)}="([^"]*)"', attrs_str)
+        if match:
+            props[html_name] = f'"{match.group(1)}"'
+
+    return props
+
+
+def format_ruby_props(props):
+    """Format a dict of props as Ruby keyword arguments."""
+    parts = []
+    for key, val in props.items():
+        if val.startswith(":"):
+            parts.append(f'{key}: {val}')
+        elif val in ("true", "false"):
+            parts.append(f'{key}: {val}')
+        else:
+            parts.append(f'{key}: {val}')
+    return ", ".join(parts)
+
+
+def extract_classname(attrs_str):
+    """Extract className/class value from attrs string."""
+    m = re.search(r'class(?:Name)?="([^"]*)"', attrs_str)
+    if m:
+        return m.group(1)
+    cn_match = re.search(r'class(?:Name)?=\{cn\(([^)]+)\)\}', attrs_str)
+    if cn_match:
+        strings = re.findall(r'"([^"]*)"', cn_match.group(1))
+        return " ".join(strings)
+    return ""
+
+
+def remove_classname_attr(attrs_str):
+    """Remove className/class attribute from attrs string."""
+    result = re.sub(r'\s*class(?:Name)?="[^"]*"', '', attrs_str)
+    result = re.sub(r'\s*class(?:Name)?=\{cn\([^)]+\)\}', '', result)
+    # Also remove React-specific attrs
+    result = re.sub(r'\s*asChild', '', result)
+    result = re.sub(r'\s*\{\.\.\.(?:props|rest)\}', '', result)
+    # Transform remaining known attrs
+    for jsx_attr, html_attr in ATTR_MAP.items():
+        result = re.sub(rf'\b{re.escape(jsx_attr)}=', f'{html_attr}=', result)
+    return result
+
+
+def merge_classes(default, extra):
+    """Merge default Tailwind classes with extra classes."""
+    parts = []
+    if default:
+        parts.append(default.strip())
+    if extra:
+        parts.append(extra.strip())
+    return " ".join(parts)
+
+
+# ---------------------------------------------------------------------------
+# Generator
+# ---------------------------------------------------------------------------
+
+def generate_helper(name, component_type="block"):
+    """Generate a Ruby helper file for the component."""
+    module_name = snake_to_camel(name.replace("-", "_"))
+    helper_name = name.replace("-", "_")
+
+    return textwrap.dedent(f"""\
+        module Components::{module_name}Helper
+          def render_{helper_name}(**options, &block)
+            render "components/ui/{helper_name}", **options, &block
+          end
+        end
+    """)
+
+
+def generate_block_controller_include(name):
+    """Generate the line to include in application layout or controller."""
+    helper_name = name.replace("-", "_")
+    module_name = snake_to_camel(helper_name)
+    return f"include Components::{module_name}Helper"
+
+
+def snake_to_camel(s):
+    """Convert snake_case to CamelCase."""
+    return "".join(w.capitalize() for w in s.split("_"))
+
+
+def sanitize_filename(name):
+    """Convert component name to valid file path part."""
+    return name.replace("-", "_")
+
+
+def write_file(path, content, dry_run=False):
+    """Write content to file, creating directories as needed."""
+    path = Path(path)
+    if dry_run:
+        print(f"  [DRY RUN] Would write: {path}")
+        return
+
+    path.parent.mkdir(parents=True, exist_ok=True)
+    with open(path, "w") as f:
+        f.write(content)
+    print(f"  Created: {path}")
+
+
+def update_components_json(name, files, comp_type="registry:block"):
+    """Add entry to components.json."""
+    existing = load_existing_components()
+    entry = {
+        "name": name,
+        "type": comp_type.replace("registry:", "components:") if ":" in comp_type else f"components:{comp_type}",
+        "files": [str(f) for f in files],
+    }
+    existing[name] = entry
+    with open(COMPONENTS_JSON, "w") as f:
+        json.dump(existing, f, indent=2, ensure_ascii=False)
+        f.write("\n")
+    print(f"  Updated: {COMPONENTS_JSON}")
+
+
+# ---------------------------------------------------------------------------
+# Main Pipeline
+# ---------------------------------------------------------------------------
+
+def process_component(name, style="new-york", url=None, output_dir=None, dry_run=False):
+    """Main pipeline: fetch → parse → transform → generate."""
+    print(f"\n{'='*60}")
+    print(f"  shadcn_to_rails: Converting '{name}'")
+    print(f"{'='*60}\n")
+
+    # 1. Fetch
+    data = fetch_registry(name, style, url)
+    if not data:
+        print("  FAILED: Could not fetch component data.")
+        return False
+
+    comp_type = data.get("type", "registry:block")
+    description = data.get("description", "")
+    print(f"  Type: {comp_type}")
+    print(f"  Description: {description}")
+
+    # 2. Check dependencies
+    existing = load_existing_components()
+    missing = resolve_dependencies(data, existing)
+    if missing:
+        print(f"\n  WARNING: Missing dependencies: {', '.join(missing)}")
+        print(f"  These components are not yet implemented in shadcn-rails.")
+        print(f"  The generated code may need manual adjustments.\n")
+
+    # 3. Process each file
+    files = data.get("files", [])
+    generated_files = []
+
+    for file_info in files:
+        tsx_content = file_info.get("content", "")
+        file_path = file_info.get("path", "")
+        file_type = file_info.get("type", "")
+
+        if not tsx_content:
+            continue
+
+        print(f"\n  Processing: {file_path} ({file_type})")
+
+        # Parse imports
+        imports = extract_imports(tsx_content)
+        icons = imports["icons"]
+        if icons:
+            print(f"    Icons: {', '.join(sorted(icons))}")
+
+        # Extract JSX body
+        jsx_body = extract_jsx_body(tsx_content)
+
+        # Determine output paths
+        safe_name = sanitize_filename(name)
+
+        # Build partial_prefix for block sub-component render paths
+        partial_prefix = ""
+        if comp_type == "registry:block":
+            partial_prefix = f"blocks/{safe_name}/"
+
+        # Transform to ERB
+        erb_content = transform_jsx_to_erb(jsx_body, icons, partial_prefix=partial_prefix)
+
+        if comp_type == "registry:block":
+            if output_dir:
+                base_dir = PROJECT_ROOT / output_dir
+            else:
+                base_dir = PROJECT_ROOT / "app" / "views" / "blocks" / safe_name
+
+            if file_type == "registry:page":
+                erb_path = base_dir / f"_{safe_name}.html.erb"
+            elif file_type == "registry:component":
+                # Extract component function name for sub-partial
+                func_match = re.search(r'(?:export\s+)?(?:default\s+)?function\s+(\w+)', tsx_content)
+                if func_match:
+                    sub_name = sanitize_filename(camel_to_snake(func_match.group(1)))
+                else:
+                    sub_name = Path(file_path).stem.replace("-", "_")
+                erb_path = base_dir / f"_{sub_name}.html.erb"
+            else:
+                erb_path = base_dir / f"_{Path(file_path).stem.replace('-', '_')}.html.erb"
+
+            write_file(erb_path, erb_content + "\n", dry_run)
+            generated_files.append(str(erb_path.relative_to(PROJECT_ROOT)))
+
+        elif comp_type == "registry:ui":
+            erb_path = PROJECT_ROOT / "app" / "views" / "components" / "ui" / f"_{safe_name}.html.erb"
+            helper_path = PROJECT_ROOT / "app" / "helpers" / "components" / f"{safe_name}_helper.rb"
+
+            write_file(erb_path, erb_content + "\n", dry_run)
+            generated_files.append(str(erb_path.relative_to(PROJECT_ROOT)))
+
+            if not helper_path.exists():
+                helper_content = generate_helper(name)
+                write_file(helper_path, helper_content, dry_run)
+                generated_files.append(str(helper_path.relative_to(PROJECT_ROOT)))
+
+    # 4. Update components.json
+    if generated_files and not dry_run:
+        update_components_json(name, generated_files, comp_type)
+
+    # 5. Summary
+    print(f"\n{'='*60}")
+    print(f"  Done! Generated {len(generated_files)} file(s) for '{name}'")
+    for f in generated_files:
+        print(f"    - {f}")
+    print(f"{'='*60}\n")
+
+    return True
+
+
+def camel_to_snake(name):
+    """Convert CamelCase to snake_case."""
+    s1 = re.sub(r'(.)([A-Z][a-z]+)', r'\1_\2', name)
+    return re.sub(r'([a-z0-9])([A-Z])', r'\1_\2', s1).lower()
+
+
+# ---------------------------------------------------------------------------
+# CLI
+# ---------------------------------------------------------------------------
+
+def main():
+    parser = argparse.ArgumentParser(
+        description="Convert React shadcn/ui components to Rails ERB + Helper",
+        epilog="Examples:\n"
+               "  python bin/shadcn_to_rails login-03\n"
+               "  python bin/shadcn_to_rails button\n"
+               "  python bin/shadcn_to_rails --url https://ui.shadcn.com/r/styles/new-york/sidebar-01.json\n",
+        formatter_class=argparse.RawDescriptionHelpFormatter,
+    )
+    parser.add_argument("name", nargs="?", help="Component or block name (e.g., login-03, button)")
+    parser.add_argument("--style", default="new-york", help="shadcn style (default: new-york)")
+    parser.add_argument("--url", help="Direct URL to registry JSON")
+    parser.add_argument("--output-dir", help="Custom output directory (relative to project root)")
+    parser.add_argument("--dry-run", action="store_true", help="Preview without writing files")
+    parser.add_argument("--list-deps", action="store_true", help="Only list dependencies, don't convert")
+
+    args = parser.parse_args()
+
+    if not args.name and not args.url:
+        parser.print_help()
+        sys.exit(1)
+
+    name = args.name
+    if not name and args.url:
+        # Extract name from URL
+        name = args.url.rstrip("/").split("/")[-1].replace(".json", "")
+
+    if args.list_deps:
+        data = fetch_registry(name, args.style, args.url)
+        if data:
+            existing = load_existing_components()
+            deps = data.get("registryDependencies", [])
+            print(f"\nDependencies for '{name}':")
+            for dep in deps:
+                status = "OK" if dep in existing else "MISSING"
+                print(f"  [{status}] {dep}")
+        sys.exit(0)
+
+    success = process_component(
+        name,
+        style=args.style,
+        url=args.url,
+        output_dir=args.output_dir,
+        dry_run=args.dry_run,
+    )
+    sys.exit(0 if success else 1)
+
+
+if __name__ == "__main__":
+    main()
