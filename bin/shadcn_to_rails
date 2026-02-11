@@ -6,9 +6,15 @@ Usage:
     python bin/shadcn_to_rails <component-name> [options]
 
 Examples:
+    # Registry API에서 가져오기
     python bin/shadcn_to_rails login-03
     python bin/shadcn_to_rails button
     python bin/shadcn_to_rails --url https://ui.shadcn.com/r/styles/new-york/sidebar-01.json
+
+    # 로컬 TSX 파일 직접 변환
+    python bin/shadcn_to_rails my-component --file src/page.tsx
+    python bin/shadcn_to_rails my-block --file src/page.tsx --file src/components/form.tsx
+    python bin/shadcn_to_rails my-block --file src/            # 디렉토리 내 모든 .tsx
 """
 
 import argparse
@@ -219,6 +225,66 @@ def fetch_registry(name, style="new-york", url=None):
     except Exception as e:
         print(f"  ERROR: {e}")
         return None
+
+
+def load_local_files(file_paths):
+    """Build registry-compatible data from local TSX files.
+
+    Accepts a list of file paths. If a path is a directory, all .tsx/.jsx
+    files within it (recursively) are included.
+
+    Returns a dict matching the shadcn registry JSON structure:
+      { "type": "registry:block", "files": [ { "path": ..., "content": ..., "type": ... } ] }
+    """
+    collected = []
+    for fp in file_paths:
+        p = Path(fp)
+        if not p.exists():
+            print(f"  WARNING: File not found: {fp}")
+            continue
+        if p.is_dir():
+            # Collect all .tsx/.jsx files recursively
+            for ext in ("**/*.tsx", "**/*.jsx"):
+                collected.extend(sorted(p.glob(ext)))
+        else:
+            collected.append(p)
+
+    if not collected:
+        print("  ERROR: No .tsx/.jsx files found.")
+        return None
+
+    # Sort: page.tsx/index.tsx first, then alphabetically
+    def sort_key(f):
+        stem = f.stem.lower()
+        if stem in ("page", "index"):
+            return (0, str(f))
+        return (1, str(f))
+    collected.sort(key=sort_key)
+
+    files = []
+    for i, f in enumerate(collected):
+        content = f.read_text(encoding="utf-8")
+        # Heuristic: page.tsx/index.tsx → registry:page, others → registry:component
+        stem = f.stem.lower()
+        if stem in ("page", "index"):
+            file_type = "registry:page"
+        elif i == 0:
+            # If no page.tsx found, treat first file as page
+            file_type = "registry:page"
+        else:
+            file_type = "registry:component"
+        files.append({
+            "path": str(f),
+            "content": content,
+            "type": file_type,
+        })
+        print(f"  Loaded: {f} ({file_type})")
+
+    return {
+        "type": "registry:block",
+        "description": f"Local files: {', '.join(str(f) for f in collected)}",
+        "files": files,
+    }
 
 
 def load_existing_components():
@@ -856,16 +922,19 @@ def update_components_json(name, files, comp_type="registry:block"):
 # Main Pipeline
 # ---------------------------------------------------------------------------
 
-def process_component(name, style="new-york", url=None, output_dir=None, dry_run=False):
-    """Main pipeline: fetch → parse → transform → generate."""
+def process_component(name, style="new-york", url=None, output_dir=None, dry_run=False, local_files=None):
+    """Main pipeline: fetch/load → parse → transform → generate."""
     print(f"\n{'='*60}")
     print(f"  shadcn_to_rails: Converting '{name}'")
     print(f"{'='*60}\n")
 
-    # 1. Fetch
-    data = fetch_registry(name, style, url)
+    # 1. Fetch or load local files
+    if local_files:
+        data = load_local_files(local_files)
+    else:
+        data = fetch_registry(name, style, url)
     if not data:
-        print("  FAILED: Could not fetch component data.")
+        print("  FAILED: Could not fetch/load component data.")
         return False
 
     comp_type = data.get("type", "registry:block")
@@ -985,13 +1054,15 @@ def main():
     parser.add_argument("name", nargs="?", help="Component or block name (e.g., login-03, button)")
     parser.add_argument("--style", default="new-york", help="shadcn style (default: new-york)")
     parser.add_argument("--url", help="Direct URL to registry JSON")
+    parser.add_argument("--file", action="append", dest="files", metavar="PATH",
+                        help="Local TSX/JSX file or directory to convert (can be repeated)")
     parser.add_argument("--output-dir", help="Custom output directory (relative to project root)")
     parser.add_argument("--dry-run", action="store_true", help="Preview without writing files")
     parser.add_argument("--list-deps", action="store_true", help="Only list dependencies, don't convert")
 
     args = parser.parse_args()
 
-    if not args.name and not args.url:
+    if not args.name and not args.url and not args.files:
         parser.print_help()
         sys.exit(1)
 
@@ -999,6 +1070,12 @@ def main():
     if not name and args.url:
         # Extract name from URL
         name = args.url.rstrip("/").split("/")[-1].replace(".json", "")
+    if not name and args.files:
+        # Derive name from first file/directory path
+        first = Path(args.files[0])
+        name = (first if first.is_dir() else first.parent).name.replace("-", "_")
+        if name in (".", "src", "component", "components"):
+            name = first.stem.replace("-", "_")
 
     if args.list_deps:
         data = fetch_registry(name, args.style, args.url)
@@ -1017,6 +1094,7 @@ def main():
         url=args.url,
         output_dir=args.output_dir,
         dry_run=args.dry_run,
+        local_files=args.files,
     )
     sys.exit(0 if success else 1)
 
