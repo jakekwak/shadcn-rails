@@ -478,5 +478,386 @@
     "files": [
       "app/views/blocks/about3/_about3.html.erb"
     ]
+  },
+  "blogpost1": {
+    "name": "blogpost1",
+    "type": "components:block",
+    "files": [
+      "app/views/blocks/blogpost1/_blogpost1.html.erb"
+    ]
+  },
+  "casestudy8": {
+    "name": "casestudy8",
+    "type": "components:block",
+    "files": [
+      "app/views/blocks/casestudy8/_casestudy8.html.erb"
+    ]
+  },
+  "banner1": {
+    "name": "banner1",
+    "type": "components:block",
+    "files": [
+      "app/views/blocks/banner1/_banner1.html.erb"
+    ]
+  },
+  "blog7": {
+    "name": "blog7",
+    "type": "components:block",
+    "files": [
+      "app/views/blocks/blog7/_blog7.html.erb"
+    ]
+  },
+  "careers4": {
+    "name": "careers4",
+    "type": "components:block",
+    "files": [
+      "app/views/blocks/careers4/_careers4.html.erb"
+    ]
+  },
+  "casestudies2": {
+    "name": "casestudies2",
+    "type": "components:block",
+    "files": [
+      "app/views/blocks/casestudies2/_casestudies2.html.erb"
+    ]
+  },
+  "changelog1": {
+    "name": "changelog1",
+    "type": "components:block",
+    "files": [
+      "app/views/blocks/changelog1/_changelog1.html.erb"
+    ]
+  },
+  "code-block": {
+    "name": "code-block",
+    "type": "components:ui",
+    "files": [
+      "app/helpers/components/code_block_helper.rb",
+      "app/views/components/ui/_code_block.html.erb",
+      "app/javascript/controllers/ui/code_block_controller.js",
+      "app/assets/tailwind/code_block.css"
+    ]
+  },
+  "codeexample1": {
+    "name": "codeexample1",
+    "type": "components:block",
+    "files": [
+      "app/views/blocks/codeexample1/_codeexample1.html.erb"
+    ]
+  },
+  "community1": {
+    "name": "community1",
+    "type": "components:block",
+    "files": [
+      "app/views/blocks/community1/_community1.html.erb"
+    ]
+  },
+  "compare7": {
+    "name": "compare7",
+    "type": "components:block",
+    "files": [
+      "app/views/blocks/compare7/_compare7.html.erb"
+    ]
+  },
+  "compliance1": {
+    "name": "compliance1",
+    "type": "components:block",
+    "files": [
+      "app/views/blocks/compliance1/_compliance1.html.erb"
+    ]
+  },
+  "contact7": {
+    "name": "contact7",
+    "type": "components:block",
+    "files": [
+      "app/views/blocks/contact7/_contact7.html.erb"
+    ]
+  },
+  "content1": {
+    "name": "content1",
+    "type": "components:block",
+    "files": [
+      "app/views/blocks/content1/_content1.html.erb"
+    ]
+  },
+  "cta10": {
+    "name": "cta10",
+    "type": "components:block",
+    "files": [
+      "app/views/blocks/cta10/_cta10.html.erb"
+    ]
+  },
+  "cta11": {
+    "name": "cta11",
+    "type": "components:block",
+    "files": [
+      "app/views/blocks/cta11/_cta11.html.erb"
+    ]
+  },
+  "download2": {
+    "name": "download2",
+    "type": "components:block",
+    "files": [
+      "app/views/blocks/download2/_download2.html.erb"
+    ]
+  },
+  "experience5": {
+    "name": "experience5",
+    "type": "components:block",
+    "files": [
+      "app/views/blocks/experience5/_experience5.html.erb"
+    ]
+  },
+  "faq1": {
+    "name": "faq1",
+    "type": "components:block",
+    "files": [
+      "app/views/blocks/faq1/_faq1.html.erb"
+    ]
+  },
+  "feature1": {
+    "name": "feature1",
+    "type": "components:block",
+    "files": [
+      "app/views/blocks/feature1/_feature1.html.erb"
+    ]
+  },
+  "feature13": {
+    "name": "feature13",
+    "type": "components:block",
+    "files": [
+      "app/views/blocks/feature13/_feature13.html.erb"
+    ]
+  },
+  "feature166": {
+    "name": "feature166",
+    "type": "components:block",
+    "files": [
+      "app/views/blocks/feature166/_feature166.html.erb"
+    ]
+  },
+  "feature17": {
+    "name": "feature17",
+    "type": "components:block",
+    "files": [
+      "app/views/blocks/feature17/_feature17.html.erb"
+    ]
+  },
+  "feature197": {
+    "name": "feature197",
+    "type": "components:block",
+    "files": [
+      "app/views/blocks/feature197/_feature197.html.erb"
+    ]
+  },
+  "feature2": {
+    "name": "feature2",
+    "type": "components:block",
+    "files": [
+      "app/views/blocks/feature2/_feature2.html.erb"
+    ]
+  },
+  "feature43": {
+    "name": "feature43",
+    "type": "components:block",
+    "files": [
+      "app/views/blocks/feature43/_feature43.html.erb"
+    ]
+  },
+  "feature51": {
+    "name": "feature51",
+    "type": "components:block",
+    "files": [
+      "app/views/blocks/feature51/_feature51.html.erb"
+    ]
+  },
+  "feature72": {
+    "name": "feature72",
+    "type": "components:block",
+    "files": [
+      "app/views/blocks/feature72/_feature72.html.erb"
+    ]
+  },
+  "feature73": {
+    "name": "feature73",
+    "type": "components:block",
+    "files": [
+      "app/views/blocks/feature73/_feature73.html.erb"
+    ]
+  },
+  "footer2": {
+    "name": "footer2",
+    "type": "components:block",
+    "files": [
+      "app/views/blocks/footer2/_footer2.html.erb"
+    ]
+  },
+  "gallery6": {
+    "name": "gallery6",
+    "type": "components:block",
+    "files": [
+      "app/views/blocks/gallery6/_gallery6.html.erb"
+    ]
+  },
+  "hero1": {
+    "name": "hero1",
+    "type": "components:block",
+    "files": [
+      "app/views/blocks/hero1/_hero1.html.erb"
+    ]
+  },
+  "hero115": {
+    "name": "hero115",
+    "type": "components:block",
+    "files": [
+      "app/views/blocks/hero115/_hero115.html.erb"
+    ]
+  },
+  "hero3": {
+    "name": "hero3",
+    "type": "components:block",
+    "files": [
+      "app/views/blocks/hero3/_hero3.html.erb"
+    ]
+  },
+  "hero45": {
+    "name": "hero45",
+    "type": "components:block",
+    "files": [
+      "app/views/blocks/hero45/_hero45.html.erb"
+    ]
+  },
+  "hero47": {
+    "name": "hero47",
+    "type": "components:block",
+    "files": [
+      "app/views/blocks/hero47/_hero47.html.erb"
+    ]
+  },
+  "hero7": {
+    "name": "hero7",
+    "type": "components:block",
+    "files": [
+      "app/views/blocks/hero7/_hero7.html.erb"
+    ]
+  },
+  "integration3": {
+    "name": "integration3",
+    "type": "components:block",
+    "files": [
+      "app/views/blocks/integration3/_integration3.html.erb"
+    ]
+  },
+  "list2": {
+    "name": "list2",
+    "type": "components:block",
+    "files": [
+      "app/views/blocks/list2/_list2.html.erb"
+    ]
+  },
+  "login1": {
+    "name": "login1",
+    "type": "components:block",
+    "files": [
+      "app/views/blocks/login1/_login1.html.erb"
+    ]
+  },
+  "logos8": {
+    "name": "logos8",
+    "type": "components:block",
+    "files": [
+      "app/views/blocks/logos8/_logos8.html.erb"
+    ]
+  },
+  "navbar1": {
+    "name": "navbar1",
+    "type": "components:block",
+    "files": [
+      "app/views/blocks/navbar1/_navbar1.html.erb"
+    ]
+  },
+  "pricing2": {
+    "name": "pricing2",
+    "type": "components:block",
+    "files": [
+      "app/views/blocks/pricing2/_pricing2.html.erb"
+    ]
+  },
+  "pricing4": {
+    "name": "pricing4",
+    "type": "components:block",
+    "files": [
+      "app/views/blocks/pricing4/_pricing4.html.erb"
+    ]
+  },
+  "pricing6": {
+    "name": "pricing6",
+    "type": "components:block",
+    "files": [
+      "app/views/blocks/pricing6/_pricing6.html.erb"
+    ]
+  },
+  "resource1": {
+    "name": "resource1",
+    "type": "components:block",
+    "files": [
+      "app/views/blocks/resource1/_resource1.html.erb"
+    ]
+  },
+  "service1": {
+    "name": "service1",
+    "type": "components:block",
+    "files": [
+      "app/views/blocks/service1/_service1.html.erb"
+    ]
+  },
+  "services4": {
+    "name": "services4",
+    "type": "components:block",
+    "files": [
+      "app/views/blocks/services4/_services4.html.erb"
+    ]
+  },
+  "signup1": {
+    "name": "signup1",
+    "type": "components:block",
+    "files": [
+      "app/views/blocks/signup1/_signup1.html.erb"
+    ]
+  },
+  "stats8": {
+    "name": "stats8",
+    "type": "components:block",
+    "files": [
+      "app/views/blocks/stats8/_stats8.html.erb"
+    ]
+  },
+  "team1": {
+    "name": "team1",
+    "type": "components:block",
+    "files": [
+      "app/views/blocks/team1/_team1.html.erb"
+    ]
+  },
+  "testimonial10": {
+    "name": "testimonial10",
+    "type": "components:block",
+    "files": [
+      "app/views/blocks/testimonial10/_testimonial10.html.erb"
+    ]
+  },
+  "timeline9": {
+    "name": "timeline9",
+    "type": "components:block",
+    "files": [
+      "app/views/blocks/timeline9/_timeline9.html.erb"
+    ]
+  },
+  "waitlist1": {
+    "name": "waitlist1",
+    "type": "components:block",
+    "files": [
+      "app/views/blocks/waitlist1/_waitlist1.html.erb"
+    ]
   }
 }

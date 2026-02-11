@@ -1,0 +1,58 @@
+<section class="py-4">
+  <div class="container">
+    <%# Desktop Menu %>
+    <nav class="hidden justify-between lg:flex">
+      <div class="flex items-center gap-6">
+        <%# Logo %>
+        <a href="#" class="flex items-center gap-2">
+          <img
+            src="https://deifkwefumgah.cloudfront.net/shadcnblocks/block/logos/shadcnblockscom-icon.svg"
+            class="max-h-8 dark:invert"
+            alt="logo" />
+          <span class="text-lg font-semibold tracking-tighter">
+            Shadcnblocks.com
+          </span>
+        </a>
+        <div class="flex items-center">
+          <nav>
+            <ul class="flex items-center gap-6">
+              <li><a href="#" class="text-sm font-medium text-muted-foreground hover:text-foreground">Home</a></li>
+              <li><a href="#" class="text-sm font-medium text-muted-foreground hover:text-foreground">Pricing</a></li>
+              <li><a href="#" class="text-sm font-medium text-muted-foreground hover:text-foreground">Blog</a></li>
+              <li><a href="#" class="text-sm font-medium text-muted-foreground hover:text-foreground">Support</a></li>
+            </ul>
+          </nav>
+        </div>
+      </div>
+      <div class="flex gap-2">
+        <%= render_button(variant: :outline, size: :sm) do %>
+          <a href="#">Log in</a>
+        <% end %>
+        <%= render_button(size: :sm) do %>
+          <a href="#">Sign up</a>
+        <% end %>
+      </div>
+    </nav>
+
+    <%# Mobile Menu %>
+    <div class="block lg:hidden">
+      <div class="flex items-center justify-between">
+        <%# Logo %>
+        <a href="#" class="flex items-center gap-2">
+          <img
+            src="https://deifkwefumgah.cloudfront.net/shadcnblocks/block/logos/shadcnblockscom-icon.svg"
+            class="max-h-8 dark:invert"
+            alt="logo" />
+        </a>
+        <div class="flex gap-2">
+          <%= render_button(variant: :outline, size: :sm) do %>
+            <a href="#">Log in</a>
+          <% end %>
+          <%= render_button(size: :sm) do %>
+            <a href="#">Sign up</a>
+          <% end %>
+        </div>
+      </div>
+    </div>
+  </div>
+</section>

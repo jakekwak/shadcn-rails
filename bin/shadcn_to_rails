@@ -151,6 +151,21 @@ SUB_COMPONENT_MAP = {
     "FormControl": {"tag": "div", "class": "", "unwrap": True},
     "FormDescription": {"tag": "p", "class": "text-sm text-muted-foreground"},
     "FormMessage": {"tag": "p", "class": "text-sm font-medium text-destructive"},
+    # Avatar sub-components (when not using render_avatar helper)
+    "AvatarImage": {"tag": "img", "class": "aspect-square h-full w-full rounded-full object-cover"},
+    "AvatarFallback": {"tag": "span", "class": "flex h-full w-full items-center justify-center rounded-full bg-muted text-sm font-medium"},
+    # Carousel sub-components
+    "CarouselContent": {"tag": "div", "class": "flex"},
+    "CarouselItem": {"tag": "div", "class": "min-w-0 shrink-0 grow-0 basis-full"},
+    "CarouselPrevious": {"tag": "button", "class": ""},
+    "CarouselNext": {"tag": "button", "class": ""},
+    # Breadcrumb sub-components
+    "BreadcrumbList": {"tag": "ol", "class": "flex flex-wrap items-center gap-1.5 break-words text-sm text-muted-foreground sm:gap-2.5"},
+    "BreadcrumbItem": {"tag": "li", "class": "inline-flex items-center gap-1.5"},
+    "BreadcrumbLink": {"tag": "a", "class": "transition-colors hover:text-foreground"},
+    "BreadcrumbPage": {"tag": "span", "class": "font-normal text-foreground"},
+    "BreadcrumbSeparator": {"tag": "li", "class": "[&>svg]:size-3.5"},
+    "BreadcrumbEllipsis": {"tag": "span", "class": "flex h-9 w-9 items-center justify-center"},
 }
 
 # JSX attribute name → HTML attribute name
@@ -213,6 +228,40 @@ LUCIDE_ICONS = {
     "Trash": '<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="size-4"><path d="M3 6h18"/><path d="M19 6v14c0 1-1 2-2 2H7c-1 0-2-1-2-2V6"/><path d="M8 6V4c0-1 1-2 2-2h4c1 0 2 1 2 2v2"/></svg>',
     "GalleryVerticalEnd": '<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="size-4"><path d="M7 2h10"/><path d="M5 6h14"/><rect width="18" height="12" x="3" y="10" rx="2"/></svg>',
     "CircleAlert": '<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="size-4"><circle cx="12" cy="12" r="10"/><line x1="12" x2="12" y1="8" y2="12"/><line x1="12" x2="12.01" y1="16" y2="16"/></svg>',
+    "ArrowUpRight": '<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="size-4"><path d="M7 7h10v10"/><path d="M7 17 17 7"/></svg>',
+    "ArrowDown": '<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="size-4"><path d="M12 5v14"/><path d="m19 12-7 7-7-7"/></svg>',
+    "ArrowUp": '<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="size-4"><path d="m5 12 7-7 7 7"/><path d="M12 19V5"/></svg>',
+    "Play": '<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="size-4"><polygon points="6 3 20 12 6 21 6 3"/></svg>',
+    "Download": '<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="size-4"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" x2="12" y1="15" y2="3"/></svg>',
+    "Phone": '<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="size-4"><path d="M22 16.92v3a2 2 0 0 1-2.18 2 19.79 19.79 0 0 1-8.63-3.07 19.5 19.5 0 0 1-6-6 19.79 19.79 0 0 1-3.07-8.67A2 2 0 0 1 4.11 2h3a2 2 0 0 1 2 1.72 12.84 12.84 0 0 0 .7 2.81 2 2 0 0 1-.45 2.11L8.09 9.91a16 16 0 0 0 6 6l1.27-1.27a2 2 0 0 1 2.11-.45 12.84 12.84 0 0 0 2.81.7A2 2 0 0 1 22 16.92z"/></svg>',
+    "MapPin": '<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="size-4"><path d="M20 10c0 6-8 12-8 12s-8-6-8-12a8 8 0 0 1 16 0Z"/><circle cx="12" cy="10" r="3"/></svg>',
+    "Clock": '<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="size-4"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>',
+    "Globe": '<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="size-4"><circle cx="12" cy="12" r="10"/><path d="M12 2a14.5 14.5 0 0 0 0 20 14.5 14.5 0 0 0 0-20"/><path d="M2 12h20"/></svg>',
+    "Zap": '<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="size-4"><path d="M4 14a1 1 0 0 1-.78-1.63l9.9-10.2a.5.5 0 0 1 .86.46l-1.92 6.02A1 1 0 0 0 13 10h7a1 1 0 0 1 .78 1.63l-9.9 10.2a.5.5 0 0 1-.86-.46l1.92-6.02A1 1 0 0 0 11 14z"/></svg>',
+    "Shield": '<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="size-4"><path d="M20 13c0 5-3.5 7.5-7.66 8.95a1 1 0 0 1-.67-.01C7.5 20.5 4 18 4 13V6a1 1 0 0 1 1-1c2 0 4.5-1.2 6.24-2.72a1.17 1.17 0 0 1 1.52 0C14.51 3.81 17 5 19 5a1 1 0 0 1 1 1z"/></svg>',
+    "Heart": '<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="size-4"><path d="M19 14c1.49-1.46 3-3.21 3-5.5A5.5 5.5 0 0 0 16.5 3c-1.76 0-3 .5-4.5 2-1.5-1.5-2.74-2-4.5-2A5.5 5.5 0 0 0 2 8.5c0 2.3 1.5 4.05 3 5.5l7 7Z"/></svg>',
+    "ExternalLink": '<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="size-4"><path d="M15 3h6v6"/><path d="M10 14 21 3"/><path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"/></svg>',
+    "Copy": '<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="size-4"><rect width="14" height="14" x="8" y="8" rx="2" ry="2"/><path d="M4 16c-1.1 0-2-.9-2-2V4c0-1.1.9-2 2-2h10c1.1 0 2 .9 2 2"/></svg>',
+    "CircleCheck": '<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="size-4"><circle cx="12" cy="12" r="10"/><path d="m9 12 2 2 4-4"/></svg>',
+    "CircleX": '<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="size-4"><circle cx="12" cy="12" r="10"/><path d="m15 9-6 6"/><path d="m9 9 6 6"/></svg>',
+    "Info": '<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="size-4"><circle cx="12" cy="12" r="10"/><path d="M12 16v-4"/><path d="M12 8h.01"/></svg>',
+    "Users": '<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="size-4"><path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M22 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg>',
+    "Calendar": '<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="size-4"><path d="M8 2v4"/><path d="M16 2v4"/><rect width="18" height="18" x="3" y="4" rx="2"/><path d="M3 10h18"/></svg>',
+    "Github": '<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="size-4"><path d="M15 22v-4a4.8 4.8 0 0 0-1-3.5c3 0 6-2 6-5.5.08-1.25-.27-2.48-1-3.5.28-1.15.28-2.35 0-3.5 0 0-1 0-3 1.5-2.64-.5-5.36-.5-8 0C6 2 5 2 5 2c-.3 1.15-.3 2.35 0 3.5A5.403 5.403 0 0 0 4 9c0 3.5 3 5.5 6 5.5-.39.49-.68 1.05-.85 1.65-.17.6-.22 1.23-.15 1.85v4"/><path d="M9 18c-4.51 2-5-2-7-2"/></svg>',
+    "Twitter": '<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="size-4"><path d="M22 4s-.7 2.1-2 3.4c1.6 10-9.4 17.3-18 11.6 2.2.1 4.4-.6 6-2C3 15.5.5 9.6 3 5c2.2 2.6 5.6 4.1 9 4-.9-4.2 4-6.6 7-3.8 1.1 0 3-1.2 3-1.2z"/></svg>',
+    "Linkedin": '<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="size-4"><path d="M16 8a6 6 0 0 1 6 6v7h-4v-7a2 2 0 0 0-2-2 2 2 0 0 0-2 2v7h-4v-7a6 6 0 0 1 6-6z"/><rect width="4" height="12" x="2" y="9"/><circle cx="4" cy="4" r="2"/></svg>',
+    "Code": '<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="size-4"><polyline points="16 18 22 12 16 6"/><polyline points="8 6 2 12 8 18"/></svg>',
+    "Terminal": '<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="size-4"><polyline points="4 17 10 11 4 5"/><line x1="12" x2="20" y1="19" y2="19"/></svg>',
+    "Lock": '<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="size-4"><rect width="18" height="11" x="3" y="11" rx="2" ry="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg>',
+    "Sparkles": '<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="size-4"><path d="M9.937 15.5A2 2 0 0 0 8.5 14.063l-6.135-1.582a.5.5 0 0 1 0-.962L8.5 9.936A2 2 0 0 0 9.937 8.5l1.582-6.135a.5.5 0 0 1 .963 0L14.063 8.5A2 2 0 0 0 15.5 9.937l6.135 1.581a.5.5 0 0 1 0 .964L15.5 14.063a2 2 0 0 0-1.437 1.437l-1.582 6.135a.5.5 0 0 1-.963 0z"/><path d="M20 3v4"/><path d="M22 5h-4"/><path d="M4 17v2"/><path d="M5 18H3"/></svg>',
+    "Rocket": '<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="size-4"><path d="M4.5 16.5c-1.5 1.26-2 5-2 5s3.74-.5 5-2c.71-.84.7-2.13-.09-2.91a2.18 2.18 0 0 0-2.91-.09z"/><path d="m12 15-3-3a22 22 0 0 1 2-3.95A12.88 12.88 0 0 1 22 2c0 2.72-.78 7.5-6 11a22.35 22.35 0 0 1-4 2z"/><path d="M9 12H4s.55-3.03 2-4c1.62-1.08 5 0 5 0"/><path d="M12 15v5s3.03-.55 4-2c1.08-1.62 0-5 0-5"/></svg>',
+    "Briefcase": '<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="size-4"><path d="M16 20V4a2 2 0 0 0-2-2h-4a2 2 0 0 0-2 2v16"/><rect width="20" height="14" x="2" y="6" rx="2"/></svg>',
+    "BarChart": '<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="size-4"><line x1="12" x2="12" y1="20" y2="10"/><line x1="18" x2="18" y1="20" y2="4"/><line x1="6" x2="6" y1="20" y2="16"/></svg>',
+    "Layers": '<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="size-4"><path d="m12.83 2.18a2 2 0 0 0-1.66 0L2.6 6.08a1 1 0 0 0 0 1.83l8.58 3.91a2 2 0 0 0 1.66 0l8.58-3.9a1 1 0 0 0 0-1.83Z"/><path d="m22.54 12.43-1.96-.89-8.58 3.91a2 2 0 0 1-1.66 0l-8.58-3.91-1.96.89a1 1 0 0 0 0 1.83l8.58 3.9a2 2 0 0 0 1.66 0l8.58-3.9a1 1 0 0 0 0-1.83Z"/></svg>',
+    "MessageCircle": '<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="size-4"><path d="M7.9 20A9 9 0 1 0 4 16.1L2 22Z"/></svg>',
+    "FileText": '<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="size-4"><path d="M15 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V7Z"/><path d="M14 2v4a2 2 0 0 0 2 2h4"/><path d="M10 9H8"/><path d="M16 13H8"/><path d="M16 17H8"/></svg>',
+    "Image": '<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="size-4"><rect width="18" height="18" x="3" y="3" rx="2" ry="2"/><circle cx="9" cy="9" r="2"/><path d="m21 15-3.086-3.086a2 2 0 0 0-2.828 0L6 21"/></svg>',
+    "Cpu": '<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="size-4"><rect width="16" height="16" x="4" y="4" rx="2"/><rect width="6" height="6" x="9" y="9" rx="1"/><path d="M15 2v2"/><path d="M15 20v2"/><path d="M2 15h2"/><path d="M2 9h2"/><path d="M20 15h2"/><path d="M20 9h2"/><path d="M9 2v2"/><path d="M9 20v2"/></svg>',
 }
 
 
@@ -522,6 +571,34 @@ def extract_props_defaults(tsx_content):
                     pos += 1
             pos += 1
 
+    # Parse array defaults: name = [ { ... }, ... ]
+    # Use bracket matching for nested arrays
+    for m in re.finditer(r'(\w+)\s*=\s*\[', props_str):
+        prop_name = m.group(1)
+        if prop_name in defaults:
+            continue
+        start = m.end() - 1  # position of opening [
+        depth = 0
+        pos = start
+        while pos < len(props_str):
+            ch = props_str[pos]
+            if ch == '[':
+                depth += 1
+            elif ch == ']':
+                depth -= 1
+                if depth == 0:
+                    arr_str = props_str[start:pos + 1]
+                    defaults[prop_name] = arr_str.strip()
+                    break
+            elif ch in ('"', "'"):
+                quote = ch
+                pos += 1
+                while pos < len(props_str) and props_str[pos] != quote:
+                    if props_str[pos] == '\\':
+                        pos += 1
+                    pos += 1
+            pos += 1
+
     # Parse defaults referencing const variables (e.g., companies = defaultCompanies)
     for m in re.finditer(r'(\w+)\s*=\s*([a-z]\w*)\s*[,}]', props_str):
         prop_name = m.group(1)
@@ -696,6 +773,272 @@ def _inline_props_defaults(jsx, props_defaults):
     return result
 
 
+def _remove_conditional_rendering(jsx):
+    """Remove JSX conditional rendering patterns that produce invalid ERB.
+
+    Handles patterns like:
+      {prop && (<html>...</html>)}  → <html>...</html>
+      {prop && <html>...</html>}    → <html>...</html>
+      {condition ? (<a>) : (<b>)}   → <a>  (keeps truthy branch)
+
+    These are the #1 source of broken ERB output from JSX conversion.
+    """
+    result = jsx
+
+    # Pattern 1: {expr && (<html>...</html>)}
+    # Use bracket matching for nested parens
+    # Matches both simple identifiers and complex expressions (e.g., idx < arr.length - 1)
+    pattern = r'\{[^{}]*?\s*&&\s*\('
+    iterations = 0
+    while iterations < 50:
+        m = re.search(pattern, result)
+        if not m:
+            break
+        iterations += 1
+        start_brace = m.start()
+        paren_start = m.end() - 1
+        depth = 0
+        pos = paren_start
+        while pos < len(result):
+            ch = result[pos]
+            if ch == '(':
+                depth += 1
+            elif ch == ')':
+                depth -= 1
+                if depth == 0:
+                    # Find closing }
+                    rest = result[pos + 1:].lstrip()
+                    if rest.startswith('}'):
+                        end = pos + 1 + (len(result[pos + 1:]) - len(rest)) + 1
+                        body = result[paren_start + 1:pos].strip()
+                        result = result[:start_brace] + body + result[end:]
+                    break
+            pos += 1
+        else:
+            break
+
+    # Pattern 2: {identifier && <tag>...</tag>} (without parens)
+    result = re.sub(
+        r'\{(\w+(?:\.\w+)*)\s*&&\s*(<[a-z][^}]*>(?:[^{}]*?)</[a-z]\w*>)\s*\}',
+        r'\2',
+        result, flags=re.DOTALL
+    )
+
+    # Pattern 2b: {complex_expr && <tag>...</tag>} — expressions with operators
+    result = re.sub(
+        r'\{[^{}]*?\s*&&\s*(<[a-zA-Z][^}]*>(?:[^{}]*?)</[a-zA-Z]\w*>)\s*\}',
+        r'\1',
+        result, flags=re.DOTALL
+    )
+
+    # Pattern 3: {identifier && <SelfClosing />} (without parens)
+    result = re.sub(
+        r'\{(\w+(?:\.\w+)*)\s*&&\s*(<[a-zA-Z][^}]*?/>)\s*\}',
+        r'\2',
+        result
+    )
+
+    # Pattern 3b: {complex_expr && <SelfClosing />}
+    result = re.sub(
+        r'\{[^{}]*?\s*&&\s*(<[a-zA-Z][^}]*?/>)\s*\}',
+        r'\1',
+        result
+    )
+
+    # Pattern 3c: {complex_expr && <%= ERB_helper %>}
+    result = re.sub(
+        r'\{[^{}]*?\s*&&\s*(<%=\s*[^%]+%>)\s*\}',
+        r'\1',
+        result
+    )
+
+    # Pattern 4: Simple ternary {cond ? <a> : <b>} → keep truthy branch
+    result = re.sub(
+        r'\{[^{}]+\?\s*(<[^{}]+?>(?:[^{}]*?)<\/[^{}]+?>)\s*:\s*(?:<[^{}]+?>(?:[^{}]*?)<\/[^{}]+?>|null|"")\s*\}',
+        r'\1',
+        result, flags=re.DOTALL
+    )
+
+    # Pattern 5: {cond ? "text" : "other"} → "text"
+    result = re.sub(
+        r'\{[^{}]+\?\s*"([^"]*)"\s*:\s*"[^"]*"\s*\}',
+        r'\1',
+        result
+    )
+
+    return result
+
+
+def _remove_react_fragments(jsx):
+    """Remove React.Fragment and Fragment wrappers, keeping children.
+
+    <React.Fragment>...</React.Fragment> → ...
+    <Fragment>...</Fragment> → ...
+    <>...</> → ...
+    """
+    result = jsx
+    # Named fragments
+    result = re.sub(r'<React\.Fragment\s*>', '', result)
+    result = re.sub(r'</React\.Fragment>', '', result)
+    result = re.sub(r'<Fragment\s*>', '', result)
+    result = re.sub(r'</Fragment>', '', result)
+    # Shorthand fragments
+    result = re.sub(r'<>', '', result)
+    result = re.sub(r'</>', '', result)
+    return result
+
+
+def _convert_inline_styles(jsx):
+    """Convert JSX inline styles to HTML style attributes.
+
+    style={{ transform: "rotate(45deg)", opacity: 0.5 }}
+    → style="transform: rotate(45deg); opacity: 0.5"
+
+    style={{ ...obj, key: "val" }}
+    → style="key: val"  (drop spread)
+    """
+    result = jsx
+
+    def replace_style(m):
+        inner = m.group(1).strip()
+        # Remove spread operators
+        inner = re.sub(r'\.\.\.(\w+),?\s*', '', inner)
+        # Parse key: "value" or key: number pairs
+        pairs = []
+        # camelCase → kebab-case for CSS properties
+        for pm in re.finditer(r'(\w+)\s*:\s*("([^"]*)"|\'([^\']*)\'|([^,}\s]+))', inner):
+            prop = pm.group(1)
+            val = pm.group(3) or pm.group(4) or pm.group(5) or ""
+            # Convert camelCase to kebab-case
+            css_prop = re.sub(r'([a-z])([A-Z])', lambda x: x.group(1) + '-' + x.group(2).lower(), prop)
+            pairs.append(f'{css_prop}: {val}')
+        if pairs:
+            return f'style="{"; ".join(pairs)}"'
+        return ''
+
+    # Match style={{ ... }} (double braces)
+    result = re.sub(r'style=\{\{([^}]*(?:\{[^}]*\}[^}]*)*)\}\}', replace_style, result)
+    return result
+
+
+def _convert_template_literals(jsx):
+    """Convert JSX template literals to ERB string interpolation.
+
+    {`item-${index}`}  → item-<%= index %>
+    class={`foo ${bar}`} → class="foo <%= bar %>"
+    """
+    result = jsx
+
+    # In attribute context: attr={`...${expr}...`} → attr="...<%= expr %>..."
+    def replace_attr_template(m):
+        attr = m.group(1)
+        template = m.group(2)
+        converted = re.sub(r'\$\{([^}]+)\}', r'<%= \1 %>', template)
+        return f'{attr}="{converted}"'
+    result = re.sub(r'(\w+)=\{`([^`]*)`\}', replace_attr_template, result)
+
+    # In text context: {`...${expr}...`} → ...<%= expr %>...
+    def replace_text_template(m):
+        template = m.group(1)
+        converted = re.sub(r'\$\{([^}]+)\}', r'<%= \1 %>', template)
+        return converted
+    result = re.sub(r'\{`([^`]*)`\}', replace_text_template, result)
+
+    return result
+
+
+def _convert_dangerous_inner_html(jsx):
+    """Convert dangerouslySetInnerHTML to raw ERB output.
+
+    <div dangerouslySetInnerHTML={{ __html: item.content }} />
+    → <div><%= item[:content].html_safe %></div>
+
+    <div dangerouslySetInnerHTML={{ __html: "some html" }} />
+    → <div>some html</div>
+    """
+    result = jsx
+
+    # Self-closing with dangerouslySetInnerHTML
+    def replace_dangerous_self(m):
+        tag = m.group(1)
+        attrs = m.group(2) or ""
+        html_expr = m.group(3).strip()
+        # Remove dangerouslySetInnerHTML from attrs
+        clean_attrs = re.sub(r'\s*dangerouslySetInnerHTML=\{\{[^}]*\}\}', '', attrs).strip()
+        # Determine the inner HTML expression
+        if html_expr.startswith('"') or html_expr.startswith("'"):
+            inner = html_expr.strip('"').strip("'")
+        else:
+            # Convert JS dot access to Ruby hash access
+            inner_ruby = re.sub(r'(\w+)\.(\w+)', r'<%= \1[:\2].html_safe %>', html_expr)
+            if '<%=' not in inner_ruby:
+                inner_ruby = f'<%= {html_expr}.html_safe %>'
+            inner = inner_ruby
+        attr_str = f' {clean_attrs}' if clean_attrs else ''
+        return f'<{tag}{attr_str}>{inner}</{tag}>'
+
+    result = re.sub(
+        r'<(\w+)(\s[^>]*)?\s+dangerouslySetInnerHTML=\{\{\s*__html:\s*([^}]+)\}\}\s*/>',
+        replace_dangerous_self, result
+    )
+
+    # Block element with dangerouslySetInnerHTML (opening tag)
+    def replace_dangerous_block(m):
+        tag = m.group(1)
+        attrs = m.group(2) or ""
+        html_expr = m.group(3).strip()
+        clean_attrs = re.sub(r'\s*dangerouslySetInnerHTML=\{\{[^}]*\}\}', '', attrs).strip()
+        if html_expr.startswith('"') or html_expr.startswith("'"):
+            inner = html_expr.strip('"').strip("'")
+        else:
+            inner_ruby = re.sub(r'(\w+)\.(\w+)', r'<%= \1[:\2].html_safe %>', html_expr)
+            if '<%=' not in inner_ruby:
+                inner_ruby = f'<%= {html_expr}.html_safe %>'
+            inner = inner_ruby
+        attr_str = f' {clean_attrs}' if clean_attrs else ''
+        return f'<{tag}{attr_str}>{inner}</{tag}>'
+
+    result = re.sub(
+        r'<(\w+)(\s[^>]*)?\s+dangerouslySetInnerHTML=\{\{\s*__html:\s*([^}]+)\}\}\s*>(.*?)</\1>',
+        replace_dangerous_block, result, flags=re.DOTALL
+    )
+
+    return result
+
+
+def _fix_unquoted_attributes(jsx):
+    """Fix unquoted HTML attribute values.
+
+    src=https://example.com → src="https://example.com"
+    alt=Some text → alt="Some text"
+    """
+    result = jsx
+
+    # Fix src=http... without quotes
+    result = re.sub(r'(src|href)=(https?://[^\s>"\'"]+)', r'\1="\2"', result)
+
+    # Fix common attributes with unquoted values containing /
+    result = re.sub(r'(alt|title|aria-label)=([^\s>"\'][^\s>]*)', lambda m: f'{m.group(1)}="{m.group(2)}"' if not m.group(2).startswith('"') else m.group(0), result)
+
+    return result
+
+
+def _js_dot_to_ruby_hash(expr):
+    """Convert JS dot property access to Ruby hash access.
+
+    plan.features → plan[:features]
+    item.sub.prop → item[:sub][:prop]
+    simple → simple (no change for single identifiers)
+    """
+    parts = expr.split('.')
+    if len(parts) <= 1:
+        return expr
+    result = parts[0]
+    for part in parts[1:]:
+        result += f'[:{part}]'
+    return result
+
+
 def _convert_map_to_each(jsx):
     """Convert JSX .map() iterations to ERB each loops.
 
@@ -735,8 +1078,9 @@ def _convert_map_to_each(jsx):
         return f'<% {array_name}.each do |{item_var}| %>\n{body.strip()}\n<% end %>'
 
     # Match: {arrayName.map((item, idx?) => ( ... ))}
+    # Also matches nested: {plan.features.map((feature) => (...))}
     # Use bracket matching for the outer ( ... )
-    pattern = r'\{(\w+)\.map\(\((\w+)(?:,\s*(\w+))?\)\s*=>\s*\('
+    pattern = r'\{([\w.]+)\.map\(\((\w+)(?:,\s*(\w+))?\)\s*=>\s*\('
     for m in re.finditer(pattern, result):
         start = m.end() - 1  # position of opening (
         depth = 0
@@ -757,7 +1101,7 @@ def _convert_map_to_each(jsx):
                     body = result[start + 1:pos]
 
                     # Build replacement
-                    array_name = m.group(1)
+                    array_name = _js_dot_to_ruby_hash(m.group(1))
                     item_var = m.group(2)
                     body_clean = body
 
@@ -790,8 +1134,79 @@ def _convert_map_to_each(jsx):
             pos += 1
         break  # Only replace first match, then re-scan (to handle shifted positions)
 
+    # Pattern 2: {arr.map((item) => { return (...) })}
+    pattern2 = r'\{([\w.]+)\.map\(\((\w+)(?:,\s*(\w+))?\)\s*=>\s*\{'
+    for m in re.finditer(pattern2, result):
+        start = m.end() - 1  # position of opening {
+        depth = 0
+        pos = start
+        while pos < len(result):
+            ch = result[pos]
+            if ch == '{':
+                depth += 1
+            elif ch == '}':
+                depth -= 1
+                if depth == 0:
+                    end = pos + 1
+                    rest = result[end:].lstrip()
+                    if rest.startswith(')}'):
+                        end = end + (len(result[end:]) - len(result[end:].lstrip())) + 2
+                    body = result[start + 1:pos]
+                    # Extract return (...) body
+                    return_match = re.search(r'return\s*\((.*)\)', body, flags=re.DOTALL)
+                    if return_match:
+                        body = return_match.group(1)
+                    else:
+                        return_match2 = re.search(r'return\s+(.*)', body, flags=re.DOTALL)
+                        if return_match2:
+                            body = return_match2.group(1)
+
+                    array_name = _js_dot_to_ruby_hash(m.group(1))
+                    item_var = m.group(2)
+                    body_clean = re.sub(r'\s+key=\{[^}]*\}', '', body)
+                    def replace_attr_inner2(pm, _item_var=item_var):
+                        attr = pm.group(1)
+                        prop = pm.group(2)
+                        return f'{attr}="<%= {_item_var}[:{prop}] %>"'
+                    body_clean = re.sub(rf'(\w+)=\{{{re.escape(item_var)}\.(\w+)\}}', replace_attr_inner2, body_clean)
+                    def replace_item_prop_inner2(pm, _item_var=item_var):
+                        prop = pm.group(1)
+                        return f'<%= {_item_var}[:{prop}] %>'
+                    body_clean = re.sub(rf'\{{{re.escape(item_var)}\.(\w+)\}}', replace_item_prop_inner2, body_clean)
+
+                    replacement = f'<% {array_name}.each do |{item_var}| %>\n{body_clean.strip()}\n<% end %>'
+                    result = result[:m.start()] + replacement + result[end:]
+                    break
+            elif ch in ('"', "'", '`'):
+                quote = ch
+                pos += 1
+                while pos < len(result) and result[pos] != quote:
+                    if result[pos] == '\\':
+                        pos += 1
+                    pos += 1
+            pos += 1
+        break
+
+    # Pattern 3: {arr.map((item) => <SingleLine />)} — arrow returning JSX directly without parens
+    def replace_map_single_line(m):
+        array_name = _js_dot_to_ruby_hash(m.group(1))
+        item_var = m.group(2)
+        body = m.group(3)
+        body = re.sub(r'\s+key=\{[^}]*\}', '', body)
+        body = re.sub(rf'(\w+)=\{{{re.escape(item_var)}\.(\w+)\}}',
+                       lambda pm: f'{pm.group(1)}="<%= {item_var}[:{pm.group(2)}] %>"', body)
+        body = re.sub(rf'\{{{re.escape(item_var)}\.(\w+)\}}',
+                       lambda pm: f'<%= {item_var}[:{pm.group(1)}] %>', body)
+        return f'<% {array_name}.each do |{item_var}| %>\n{body.strip()}\n<% end %>'
+
+    result = re.sub(
+        r'\{([\w.]+)\.map\(\((\w+)\)\s*=>\s*(<[A-Za-z][^)]*?/>)\s*\)\}',
+        replace_map_single_line, result
+    )
+
     # Repeat for additional .map() calls (recursive approach)
-    if re.search(r'\{\w+\.map\(', result):
+    # Guard against infinite recursion: only recurse if we actually changed something
+    if re.search(r'\{[\w.]+\.map\(', result) and result != jsx:
         result = _convert_map_to_each(result)
 
     return result
@@ -850,6 +1265,18 @@ def transform_jsx_to_erb(jsx, icons=None, partial_prefix="", props_defaults=None
     # 4. Replace JSX comments {/* ... */}
     result = re.sub(r'\{/\*.*?\*/\}', lambda m: f'<%# {m.group(0)[3:-3].strip()} %>', result, flags=re.DOTALL)
 
+    # 4a-1. Remove React.Fragment wrappers (before any other transform)
+    result = _remove_react_fragments(result)
+
+    # 4a-2. Convert dangerouslySetInnerHTML (before conditional rendering removal)
+    result = _convert_dangerous_inner_html(result)
+
+    # 4a-3. Convert JSX inline styles: style={{...}} → style="..."
+    result = _convert_inline_styles(result)
+
+    # 4a-4. Convert template literals: {`text-${var}`} → text-<%= var %>
+    result = _convert_template_literals(result)
+
     # 4b. Inline prop defaults and convert .map() loops
     if props_defaults:
         result = _inline_props_defaults(result, props_defaults)
@@ -859,6 +1286,12 @@ def transform_jsx_to_erb(jsx, icons=None, partial_prefix="", props_defaults=None
 
     # 4d. Convert object property access in attributes: attr={obj.prop} → attr="value" or attr="<%= obj[:prop] %>"
     result = _convert_object_attr_access(result, props_defaults)
+
+    # 4e. Remove JSX conditional rendering: {prop && (...)} → content
+    result = _remove_conditional_rendering(result)
+
+    # 4f. Fix unquoted HTML attributes: src=https://... → src="https://..."
+    result = _fix_unquoted_attributes(result)
 
     # 5. Handle Lucide icons - self-closing: <IconName className="..." />
     def replace_icon(m):
@@ -1174,12 +1607,26 @@ def transform_attributes(jsx):
     # Remove React event handlers: onClick={...} etc
     result = re.sub(r'\s+on[A-Z]\w+=\{[^}]*\}', '', result)
 
+    # Remove asChild prop (React-specific)
+    result = re.sub(r'\s+asChild\b', '', result)
+
+    # Remove key={...} (React-specific, outside of .map context)
+    result = re.sub(r'\s+key=\{[^}]*\}', '', result)
+    result = re.sub(r'\s+key="[^"]*"', '', result)
+
     return result
 
 
 def transform_jsx_expressions(jsx):
     """Handle remaining JSX expressions { ... }."""
     result = jsx
+
+    # Remove Array.from({length: N}, (_, i) => ...) patterns → static content
+    result = re.sub(
+        r'\{Array\.from\(\{length:\s*\d+\}.*?\)\}',
+        lambda m: f'<%# TODO: Convert Array.from() to static content %>',
+        result, flags=re.DOTALL
+    )
 
     # {variable} → <%= variable %> (simple variables, but skip objects/functions)
     def replace_expression(m):
@@ -1191,6 +1638,15 @@ def transform_jsx_expressions(jsx):
             return ''  # Spread, already handled
         if expr.startswith('/*'):
             return f'<%# {expr.strip("/* */")} %>'
+        # Skip if it's already an ERB expression or contains ERB
+        if '<%' in expr or '%>' in expr:
+            return m.group(0)
+        # Skip if it looks like a .map() call (should have been handled earlier)
+        if '.map(' in expr:
+            return f'<%# TODO: {expr} %>'
+        # Skip .filter(), .find(), .reduce() etc.
+        if re.search(r'\.\w+\(', expr) and not re.match(r'^[\w.]+$', expr):
+            return f'<%# TODO: {expr} %>'
         # Simple string interpolation
         return f'<%= {expr} %>'
 
@@ -1395,14 +1851,16 @@ def update_components_json(name, files, comp_type="registry:block"):
 # Main Pipeline
 # ---------------------------------------------------------------------------
 
-def process_component(name, style="new-york", url=None, output_dir=None, dry_run=False, local_files=None, github_urls=None):
+def process_component(name, style="new-york", url=None, output_dir=None, dry_run=False, local_files=None, github_urls=None, _preloaded_data=None):
     """Main pipeline: fetch/load → parse → transform → generate."""
     print(f"\n{'='*60}")
     print(f"  shadcn_to_rails: Converting '{name}'")
     print(f"{'='*60}\n")
 
     # 1. Fetch or load local files
-    if github_urls:
+    if _preloaded_data:
+        data = _preloaded_data
+    elif github_urls:
         data = fetch_github(github_urls)
     elif local_files:
         data = load_local_files(local_files)
@@ -1625,7 +2083,70 @@ def main():
             print("  --list-deps only works with registry sources.")
         sys.exit(0)
 
-    # Determine which mode to use (priority: github > file > registry)
+    # Check if a GitHub directory URL — process each file as a separate block
+    if len(github_urls) == 1 and "/tree/" in github_urls[0]:
+        data = fetch_github(github_urls)
+        if not data:
+            sys.exit(1)
+        total = len(data["files"])
+        ok = 0
+        fail = 0
+        for file_info in data["files"]:
+            fname = Path(file_info["path"]).stem
+            single_data = {
+                "type": "registry:block",
+                "description": file_info["path"],
+                "files": [{"path": file_info["path"], "content": file_info["content"], "type": "registry:page"}],
+            }
+            result = process_component(
+                fname,
+                style=args.style,
+                output_dir=args.output_dir,
+                dry_run=args.dry_run,
+                _preloaded_data=single_data,
+            )
+            if result:
+                ok += 1
+            else:
+                fail += 1
+        print(f"\n{'='*60}")
+        print(f"  Batch complete: {ok} succeeded, {fail} failed out of {total}")
+        print(f"{'='*60}\n")
+        sys.exit(0 if fail == 0 else 1)
+
+    # Check if a local directory with independent files
+    if len(local_files) == 1 and Path(local_files[0]).is_dir():
+        dir_path = Path(local_files[0])
+        tsx_files = sorted(dir_path.glob("*.tsx")) + sorted(dir_path.glob("*.jsx"))
+        if not tsx_files:
+            # Maybe nested — fall through to normal processing
+            pass
+        elif all(not list(f.parent.glob("page.tsx")) or f.name == "page.tsx" for f in tsx_files):
+            # Each file is an independent block (no page.tsx structure)
+            has_page = any(f.stem.lower() in ("page", "index") for f in tsx_files)
+            if not has_page and len(tsx_files) > 1:
+                # Independent files — process each separately
+                total = len(tsx_files)
+                ok = 0
+                fail = 0
+                for f in tsx_files:
+                    result = process_component(
+                        f.stem,
+                        style=args.style,
+                        output_dir=args.output_dir,
+                        dry_run=args.dry_run,
+                        local_files=[str(f)],
+                    )
+                    if result:
+                        ok += 1
+                    else:
+                        fail += 1
+                print(f"\n{'='*60}")
+                print(f"  Batch complete: {ok} succeeded, {fail} failed out of {total}")
+                print(f"{'='*60}\n")
+                sys.exit(0 if fail == 0 else 1)
+
+    # Single block mode (priority: github > file > registry)
     success = process_component(
         name,
         style=args.style,

@@ -1,0 +1,10 @@
+<%
+  group_classes = tw("grid gap-2", options[:class])
+%>
+<div role="radiogroup"
+  class="<%= group_classes %>"
+  data-controller="ui--radio-group"
+  data-ui--radio-group-name-value="<%= name %>"
+  data-ui--radio-group-value-value="<%= value %>">
+  <%= content %>
+</div>

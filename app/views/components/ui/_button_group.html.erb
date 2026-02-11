@@ -1,0 +1,10 @@
+<%
+  orientation_classes = orientation.to_sym == :vertical ? "flex-col" : "flex-row"
+  group_classes = tw("inline-flex items-center #{orientation_classes} [&>*]:rounded-none [&>*:first-child]:rounded-l-md [&>*:last-child]:rounded-r-md", options[:class])
+  if orientation.to_sym == :vertical
+    group_classes = tw("inline-flex items-stretch flex-col [&>*]:rounded-none [&>*:first-child]:rounded-t-md [&>*:last-child]:rounded-b-md", options[:class])
+  end
+%>
+<div role="group" class="<%= group_classes %>">
+  <%= content %>
+</div>

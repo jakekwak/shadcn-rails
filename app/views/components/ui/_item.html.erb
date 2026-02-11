@@ -1,0 +1,33 @@
+<%
+  variant_classes = case variant.to_sym
+  when :default
+    ""
+  when :outline
+    "border rounded-lg"
+  when :muted
+    "bg-muted rounded-lg"
+  end
+
+  size_classes = case size.to_sym
+  when :sm
+    "gap-2 p-2"
+  when :default
+    "gap-3 p-3"
+  when :lg
+    "gap-4 p-4"
+  end
+
+  item_classes = tw("flex items-center", size_classes, variant_classes, options[:class])
+%>
+<div class="<%= item_classes %>">
+  <% if content %>
+    <%= content %>
+  <% else %>
+    <div class="flex min-w-0 flex-1 flex-col">
+      <span class="text-sm font-medium leading-none"><%= title %></span>
+      <% if description %>
+        <span class="mt-1 text-sm text-muted-foreground"><%= description %></span>
+      <% end %>
+    </div>
+  <% end %>
+</div>

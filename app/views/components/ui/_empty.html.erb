@@ -1,0 +1,14 @@
+<div class="<%= tw("flex flex-col items-center justify-center py-16 text-center", options[:class]) %>">
+  <% if icon %>
+    <div class="mb-4 flex h-12 w-12 items-center justify-center rounded-full bg-muted">
+      <%= icon %>
+    </div>
+  <% end %>
+  <h3 class="text-lg font-semibold"><%= title %></h3>
+  <% if description %>
+    <p class="mt-1 text-sm text-muted-foreground max-w-sm"><%= description %></p>
+  <% end %>
+  <% if content %>
+    <div class="mt-4"><%= content %></div>
+  <% end %>
+</div>

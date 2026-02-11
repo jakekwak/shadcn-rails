@@ -1,0 +1,132 @@
+<section class="py-32" data-controller="ui--gallery-scroll">
+  <div class="container">
+    <div class="mb-8 flex flex-col justify-between md:mb-14 md:flex-row md:items-end lg:mb-16">
+      <div>
+        <h2 class="mb-3 text-3xl font-semibold md:mb-4 md:text-4xl lg:mb-6">
+          Gallery
+        </h2>
+        <a href="#" class="group flex items-center gap-1 text-sm font-medium md:text-base lg:text-lg">
+          Book a demo
+          <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="size-4 transition-transform group-hover:translate-x-1"><path d="M7 7h10v10"/><path d="M7 17 17 7"/></svg>
+        </a>
+      </div>
+      <div class="mt-8 flex shrink-0 items-center justify-start gap-2">
+        <%= render_button(variant: :outline, size: :icon, data: { action: "click->ui--gallery-scroll#prev" }) do %>
+          <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="size-5"><path d="m12 19-7-7 7-7"/><path d="M19 12H5"/></svg>
+        <% end %>
+        <%= render_button(variant: :outline, size: :icon, data: { action: "click->ui--gallery-scroll#next" }) do %>
+          <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="size-5"><path d="M5 12h14"/><path d="m12 5 7 7-7 7"/></svg>
+        <% end %>
+      </div>
+    </div>
+  </div>
+  <div class="w-full max-w-full">
+    <div class="hide-scrollbar flex gap-8 overflow-x-auto scroll-smooth px-8 2xl:px-[max(8rem,calc(50vw-700px+1rem))]" data-ui--gallery-scroll-target="track">
+      <a href="#" class="group flex min-w-[300px] max-w-[452px] flex-shrink-0 flex-col justify-between">
+        <div>
+          <div class="aspect-[3/2] flex overflow-clip rounded-xl">
+            <div class="flex-1">
+              <div class="relative h-full w-full origin-bottom transition duration-300 group-hover:scale-105">
+                <img src="https://deifkwefumgah.cloudfront.net/shadcnblocks/block/placeholder-dark-1.svg" alt="Build Modern UIs" class="h-full w-full object-cover object-center" />
+              </div>
+            </div>
+          </div>
+        </div>
+        <div class="mb-2 line-clamp-3 break-words pt-4 text-lg font-medium md:mb-3 md:pt-4 md:text-xl lg:pt-4 lg:text-2xl">
+          Build Modern UIs
+        </div>
+        <div class="text-muted-foreground mb-8 line-clamp-2 text-sm md:mb-12 md:text-base lg:mb-9">
+          Create stunning user interfaces with our comprehensive design system.
+        </div>
+        <div class="flex items-center text-sm">
+          Read more
+          <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="ml-2 size-5 transition-transform group-hover:translate-x-1"><path d="M5 12h14"/><path d="m12 5 7 7-7 7"/></svg>
+        </div>
+      </a>
+      <a href="#" class="group flex min-w-[300px] max-w-[452px] flex-shrink-0 flex-col justify-between">
+        <div>
+          <div class="aspect-[3/2] flex overflow-clip rounded-xl">
+            <div class="flex-1">
+              <div class="relative h-full w-full origin-bottom transition duration-300 group-hover:scale-105">
+                <img src="https://deifkwefumgah.cloudfront.net/shadcnblocks/block/placeholder-dark-1.svg" alt="Computer Vision Technology" class="h-full w-full object-cover object-center" />
+              </div>
+            </div>
+          </div>
+        </div>
+        <div class="mb-2 line-clamp-3 break-words pt-4 text-lg font-medium md:mb-3 md:pt-4 md:text-xl lg:pt-4 lg:text-2xl">
+          Computer Vision Technology
+        </div>
+        <div class="text-muted-foreground mb-8 line-clamp-2 text-sm md:mb-12 md:text-base lg:mb-9">
+          Powerful image recognition and processing capabilities that allow AI systems to analyze, understand, and interpret visual information from the world.
+        </div>
+        <div class="flex items-center text-sm">
+          Read more
+          <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="ml-2 size-5 transition-transform group-hover:translate-x-1"><path d="M5 12h14"/><path d="m12 5 7 7-7 7"/></svg>
+        </div>
+      </a>
+      <a href="#" class="group flex min-w-[300px] max-w-[452px] flex-shrink-0 flex-col justify-between">
+        <div>
+          <div class="aspect-[3/2] flex overflow-clip rounded-xl">
+            <div class="flex-1">
+              <div class="relative h-full w-full origin-bottom transition duration-300 group-hover:scale-105">
+                <img src="https://deifkwefumgah.cloudfront.net/shadcnblocks/block/placeholder-dark-1.svg" alt="Machine Learning Automation" class="h-full w-full object-cover object-center" />
+              </div>
+            </div>
+          </div>
+        </div>
+        <div class="mb-2 line-clamp-3 break-words pt-4 text-lg font-medium md:mb-3 md:pt-4 md:text-xl lg:pt-4 lg:text-2xl">
+          Machine Learning Automation
+        </div>
+        <div class="text-muted-foreground mb-8 line-clamp-2 text-sm md:mb-12 md:text-base lg:mb-9">
+          Self-improving algorithms that learn from data patterns to automate complex tasks and make intelligent decisions with minimal human intervention.
+        </div>
+        <div class="flex items-center text-sm">
+          Read more
+          <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="ml-2 size-5 transition-transform group-hover:translate-x-1"><path d="M5 12h14"/><path d="m12 5 7 7-7 7"/></svg>
+        </div>
+      </a>
+      <a href="#" class="group flex min-w-[300px] max-w-[452px] flex-shrink-0 flex-col justify-between">
+        <div>
+          <div class="aspect-[3/2] flex overflow-clip rounded-xl">
+            <div class="flex-1">
+              <div class="relative h-full w-full origin-bottom transition duration-300 group-hover:scale-105">
+                <img src="https://deifkwefumgah.cloudfront.net/shadcnblocks/block/placeholder-dark-1.svg" alt="Predictive Analytics" class="h-full w-full object-cover object-center" />
+              </div>
+            </div>
+          </div>
+        </div>
+        <div class="mb-2 line-clamp-3 break-words pt-4 text-lg font-medium md:mb-3 md:pt-4 md:text-xl lg:pt-4 lg:text-2xl">
+          Predictive Analytics
+        </div>
+        <div class="text-muted-foreground mb-8 line-clamp-2 text-sm md:mb-12 md:text-base lg:mb-9">
+          Advanced forecasting capabilities that analyze historical data to predict future trends and outcomes, helping businesses make data-driven decisions.
+        </div>
+        <div class="flex items-center text-sm">
+          Read more
+          <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="ml-2 size-5 transition-transform group-hover:translate-x-1"><path d="M5 12h14"/><path d="m12 5 7 7-7 7"/></svg>
+        </div>
+      </a>
+      <a href="#" class="group flex min-w-[300px] max-w-[452px] flex-shrink-0 flex-col justify-between">
+        <div>
+          <div class="aspect-[3/2] flex overflow-clip rounded-xl">
+            <div class="flex-1">
+              <div class="relative h-full w-full origin-bottom transition duration-300 group-hover:scale-105">
+                <img src="https://deifkwefumgah.cloudfront.net/shadcnblocks/block/placeholder-dark-1.svg" alt="Neural Network Architecture" class="h-full w-full object-cover object-center" />
+              </div>
+            </div>
+          </div>
+        </div>
+        <div class="mb-2 line-clamp-3 break-words pt-4 text-lg font-medium md:mb-3 md:pt-4 md:text-xl lg:pt-4 lg:text-2xl">
+          Neural Network Architecture
+        </div>
+        <div class="text-muted-foreground mb-8 line-clamp-2 text-sm md:mb-12 md:text-base lg:mb-9">
+          Sophisticated AI models inspired by human brain structure, capable of solving complex problems through deep learning and pattern recognition.
+        </div>
+        <div class="flex items-center text-sm">
+          Read more
+          <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="ml-2 size-5 transition-transform group-hover:translate-x-1"><path d="M5 12h14"/><path d="m12 5 7 7-7 7"/></svg>
+        </div>
+      </a>
+    </div>
+  </div>
+</section>

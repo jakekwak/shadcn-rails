@@ -1,0 +1,31 @@
+<section class="py-32">
+      <div class="container">
+        <div class="grid items-center gap-8 lg:grid-cols-2">
+          <div class="flex flex-col items-center text-center lg:items-start lg:text-left">
+            <%= render_badge(variant: :outline) do %>
+              ✨ Your Website Builder
+              <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="ml-2 size-4"><path d="M7 7h10v10"></path><path d="M7 17 17 7"></path></svg>
+            <% end %>
+            <h1 class="my-6 text-pretty text-4xl font-bold lg:text-6xl">
+              Blocks Built With Shadcn & Tailwind
+            </h1>
+            <p class="text-muted-foreground mb-8 max-w-xl lg:text-xl">
+              Finely crafted components built with React, Tailwind and Shadcn UI. Developers can copy and paste these blocks directly into their project.
+            </p>
+            <div class="flex w-full flex-col justify-center gap-2 sm:flex-row lg:justify-start">
+              <%= render_button(class: "w-full sm:w-auto") do %>
+                Get Started
+              <% end %>
+              <%= render_button(class: "w-full sm:w-auto", variant: :outline) do %>
+                Learn More
+                <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="size-4"><path d="M5 12h14"></path><path d="m12 5 7 7-7 7"></path></svg>
+              <% end %>
+            </div>
+          </div>
+          <img
+            src="https://deifkwefumgah.cloudfront.net/shadcnblocks/block/placeholder-1.svg"
+            alt="Hero section demo image showing interface components"
+            class="max-h-96 w-full rounded-md object-cover" />
+        </div>
+      </div>
+    </section>

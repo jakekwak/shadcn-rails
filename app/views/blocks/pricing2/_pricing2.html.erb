@@ -1,0 +1,100 @@
+<section class="py-32">
+  <div class="container">
+    <div class="mx-auto flex max-w-5xl flex-col items-center gap-6 text-center">
+      <h2 class="text-pretty text-4xl font-semibold lg:text-6xl">
+        Pricing
+      </h2>
+      <p class="text-muted-foreground lg:text-xl">Check out our affordable pricing plans</p>
+      <div class="flex items-center gap-3 text-lg">
+        Monthly
+        <%= render_switch("", id: "billing_period", name: "billing_period") %>
+        Yearly
+      </div>
+      <div class="flex flex-col items-stretch gap-6 md:flex-row">
+        <%= render_card(class: "w-full flex w-80 flex-col justify-between text-left") do %>
+          <div class="flex flex-col space-y-1.5 p-6">
+            <h3 class="font-semibold leading-none tracking-tight">
+              <p>Plus</p>
+            </h3>
+            <p class="text-muted-foreground text-sm">
+              For personal use
+            </p>
+            <div class="flex items-end">
+              <span class="text-4xl font-semibold">$19</span>
+              <span class="text-muted-foreground text-2xl font-semibold">/mo</span>
+            </div>
+          </div>
+          <div class="p-6 pt-0">
+            <%= render_separator(class: "mb-6") %>
+            <p class="mb-3 font-semibold">Includes:</p>
+            <ul class="space-y-4">
+              <li class="flex items-center gap-2 text-sm">
+                <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="size-4"><circle cx="12" cy="12" r="10"></circle><path d="m9 12 2 2 4-4"></path></svg>
+                <span>Up to 5 projects</span>
+              </li>
+              <li class="flex items-center gap-2 text-sm">
+                <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="size-4"><circle cx="12" cy="12" r="10"></circle><path d="m9 12 2 2 4-4"></path></svg>
+                <span>10GB storage</span>
+              </li>
+              <li class="flex items-center gap-2 text-sm">
+                <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="size-4"><circle cx="12" cy="12" r="10"></circle><path d="m9 12 2 2 4-4"></path></svg>
+                <span>Email support</span>
+              </li>
+              <li class="flex items-center gap-2 text-sm">
+                <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="size-4"><circle cx="12" cy="12" r="10"></circle><path d="m9 12 2 2 4-4"></path></svg>
+                <span>Basic analytics</span>
+              </li>
+            </ul>
+          </div>
+          <div class="flex items-center p-6 pt-0 mt-auto">
+            <%= render_button("Purchase", class: "w-full") %>
+          </div>
+        <% end %>
+
+        <%= render_card(class: "w-full flex w-80 flex-col justify-between text-left") do %>
+          <div class="flex flex-col space-y-1.5 p-6">
+            <h3 class="font-semibold leading-none tracking-tight">
+              <p>Pro</p>
+            </h3>
+            <p class="text-muted-foreground text-sm">
+              For professionals
+            </p>
+            <div class="flex items-end">
+              <span class="text-4xl font-semibold">$49</span>
+              <span class="text-muted-foreground text-2xl font-semibold">/mo</span>
+            </div>
+          </div>
+          <div class="p-6 pt-0">
+            <%= render_separator(class: "mb-6") %>
+            <p class="mb-3 font-semibold">Everything in Plus, and:</p>
+            <ul class="space-y-4">
+              <li class="flex items-center gap-2 text-sm">
+                <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="size-4"><circle cx="12" cy="12" r="10"></circle><path d="m9 12 2 2 4-4"></path></svg>
+                <span>Unlimited projects</span>
+              </li>
+              <li class="flex items-center gap-2 text-sm">
+                <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="size-4"><circle cx="12" cy="12" r="10"></circle><path d="m9 12 2 2 4-4"></path></svg>
+                <span>100GB storage</span>
+              </li>
+              <li class="flex items-center gap-2 text-sm">
+                <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="size-4"><circle cx="12" cy="12" r="10"></circle><path d="m9 12 2 2 4-4"></path></svg>
+                <span>Priority support</span>
+              </li>
+              <li class="flex items-center gap-2 text-sm">
+                <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="size-4"><circle cx="12" cy="12" r="10"></circle><path d="m9 12 2 2 4-4"></path></svg>
+                <span>Advanced analytics</span>
+              </li>
+              <li class="flex items-center gap-2 text-sm">
+                <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="size-4"><circle cx="12" cy="12" r="10"></circle><path d="m9 12 2 2 4-4"></path></svg>
+                <span>Custom domain</span>
+              </li>
+            </ul>
+          </div>
+          <div class="flex items-center p-6 pt-0 mt-auto">
+            <%= render_button("Purchase", class: "w-full") %>
+          </div>
+        <% end %>
+      </div>
+    </div>
+  </div>
+</section>

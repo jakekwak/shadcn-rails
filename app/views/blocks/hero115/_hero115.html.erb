@@ -1,0 +1,36 @@
+<section class="overflow-hidden py-32">
+      <div class="container">
+        <div class="flex flex-col gap-5">
+          <div class="relative flex flex-col gap-5">
+            <div
+              style="transform: translate(-50%, -50%)"
+              class="absolute left-1/2 top-1/2 -z-10 mx-auto size-[800px] rounded-full border p-16 [mask-image:linear-gradient(to_top,transparent,transparent,white,white,white,transparent,transparent)] md:size-[1300px] md:p-32"
+            >
+              <div class="size-full rounded-full border p-16 md:p-32">
+                <div class="size-full rounded-full border"></div>
+              </div>
+            </div>
+            <span class="mx-auto flex size-16 items-center justify-center rounded-full border md:size-20">
+              <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="size-8"><path d="m12 3-1.912 5.813a2 2 0 0 1-1.275 1.275L3 12l5.813 1.912a2 2 0 0 1 1.275 1.275L12 21l1.912-5.813a2 2 0 0 1 1.275-1.275L21 12l-5.813-1.912a2 2 0 0 1-1.275-1.275L12 3Z"></path></svg>
+            </span>
+            <h2 class="mx-auto max-w-5xl text-balance text-center text-3xl font-medium md:text-6xl">
+              Blocks built with Shadcn & Tailwind
+            </h2>
+            <p class="text-muted-foreground mx-auto max-w-3xl text-center md:text-lg">
+              Finely crafted components built with React, Tailwind and Shadcn UI. Developers can copy and paste these blocks directly into their project.
+            </p>
+            <div class="flex flex-col items-center justify-center gap-3 pb-12 pt-3">
+              <%= render_button(size: :lg) do %>
+                Discover Features
+                <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="size-4"><path d="M5 12h14"></path><path d="m12 5 7 7-7 7"></path></svg>
+              <% end %>
+              <div class="text-muted-foreground text-xs">Trusted by 25.000+ Businesses Worldwide</div>
+            </div>
+          </div>
+          <img
+            src="https://deifkwefumgah.cloudfront.net/shadcnblocks/block/placeholder-1.svg"
+            alt="placeholder"
+            class="mx-auto h-full max-h-[524px] w-full max-w-5xl rounded-2xl object-cover" />
+        </div>
+      </div>
+    </section>

@@ -1,0 +1,43 @@
+<section class="py-32">
+      <div class="container">
+        <div class="flex flex-col items-center gap-5">
+          <img src="https://deifkwefumgah.cloudfront.net/shadcnblocks/block/block-1.svg" alt="logo" class="size-10" />
+          <h2 class="text-center text-3xl font-semibold">
+            Join our community
+            <br  />
+            <span class="text-muted-foreground/80">
+              of designers & developers
+            </span>
+          </h2>
+          <div class="flex items-center gap-4">
+            <%= render_button(variant: :outline, size: :lg) do %>
+<a
+                href="https://x.com/shadcnblocks"
+                target="_blank"
+                class="inline-flex size-10 items-center justify-center"
+              >
+                <%= render "blocks/community1/fa_x_twitter" %>
+              </a>
+<% end %>
+            <%= render_button(variant: :outline, size: :lg) do %>
+<a
+                href="https://github.com/shadcnblocks"
+                target="_blank"
+                class="inline-flex size-10 items-center justify-center"
+              >
+                <%= render "blocks/community1/fa_github" %>
+              </a>
+<% end %>
+            <%= render_button(variant: :outline, size: :lg) do %>
+<a
+                href="https://shadcnblocks.com"
+                target="_blank"
+                class="inline-flex size-10 items-center justify-center"
+              >
+                <%= render "blocks/community1/fa_discord" %>
+              </a>
+<% end %>
+          </div>
+        </div>
+      </div>
+    </section>

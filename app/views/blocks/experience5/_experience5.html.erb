@@ -1,0 +1,43 @@
+<% experience = [
+  { title: "Senior Full Stack Developer", details: "Full-Time &bull; Remote &bull; San Francisco CA", period: "Mar 2022 - Present", company: "Anthropic", logo: "https://deifkwefumgah.cloudfront.net/shadcnblocks/block/logos/claude-icon.svg", description: "Led development of scalable web applications using React, Node.js, and PostgreSQL. Architected microservices infrastructure serving 100K+ users. Mentored junior developers and established coding standards." },
+  { title: "Frontend Engineer", details: "Full-Time &bull; Onsite &bull; Austin TX", period: "Jan 2020 - May 2021", company: "Vercel", logo: "https://deifkwefumgah.cloudfront.net/shadcnblocks/block/logos/vercel-icon.svg", description: "Developed full-stack applications using JavaScript, Python, and MySQL. Participated in agile development process and code reviews. Contributed to open-source projects and internal tooling." },
+  { title: "Junior Web Developer", details: "Full-Time &bull; Onsite &bull; Denver CO", period: "Aug 2018 - Dec 2019", company: "Figma", logo: "https://deifkwefumgah.cloudfront.net/shadcnblocks/block/logos/figma-icon.svg", description: "Created responsive websites using HTML, CSS, and JavaScript. Worked with WordPress and PHP for content management. Assisted in debugging and testing web applications." }
+] %>
+<section class="py-16 md:py-32">
+      <div class="container">
+        <div class="mx-auto max-w-7xl">
+          <h2 class="mb-12 font-serif text-4xl font-medium leading-tight md:text-7xl">
+            Work Experience
+          </h2>
+
+          <div class="space-y-8">
+            <% experience.each do |exp| %>
+              <div class="border-border border-b pb-6 last:border-b-0">
+                <div class="flex flex-col gap-4 md:flex-row md:items-start">
+                  <div class="md:w-2/3">
+                    <div class="mb-2 flex items-center gap-3">
+                      <img
+                        src="<%= exp[:logo] %>"
+                        alt="<%= exp[:company] %> logo"
+                        class="h-5 object-contain"
+                      />
+                      <h3 class="text-xl"><%= exp[:title] %></h3>
+                    </div>
+                    <p class="text-muted-foreground mb-3 text-sm">
+                      <%= exp[:details].html_safe %>
+                    </p>
+                    <p class="text-muted-foreground text-sm leading-relaxed">
+                      <%= exp[:description] %>
+                    </p>
+                  </div>
+                  <div class="text-right md:w-1/3 md:text-right">
+                    <p class="mb-1 text-sm font-medium"><%= exp[:period] %></p>
+                    <p class="text-muted-foreground text-sm"><%= exp[:company] %></p>
+                  </div>
+                </div>
+              </div>
+            <% end %>
+          </div>
+        </div>
+      </div>
+    </section>

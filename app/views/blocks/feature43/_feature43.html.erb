@@ -1,0 +1,33 @@
+<% features = [
+  { heading: "Quality", description: "Built with attention to detail and best practices. Every component is thoroughly tested and follows modern React patterns for reliability and performance." },
+  { heading: "Experience", description: "Crafted with user experience in mind. Each component is designed to be intuitive, accessible, and provide smooth interactions across all devices." },
+  { heading: "Support", description: "Comprehensive documentation and community support. Get help when you need it with detailed guides, examples, and active community assistance." },
+  { heading: "Innovation", description: "Cutting-edge design patterns and modern web technologies. Stay ahead with the latest trends in UI/UX design and development practices." },
+  { heading: "Results", description: "Proven track record of successful implementations. These components have been battle-tested in real-world applications and deliver consistent results." },
+  { heading: "Efficiency", description: "Optimized for performance and developer productivity. Lightweight, fast-loading components that help you build faster without compromising on quality." }
+] %>
+<section class="py-32">
+      <div class="container">
+        <div class="mx-auto mb-16 max-w-3xl text-center">
+            <h2 class="text-pretty text-4xl font-medium lg:text-5xl">
+              Fully featured components for Shadcn UI & Tailwind
+            </h2>
+          </div>
+        <div class="grid gap-10 md:grid-cols-2 lg:grid-cols-3">
+          <% features.each do |feature| %>
+<div class="flex flex-col">
+              <div class="bg-accent mb-5 flex size-16 items-center justify-center rounded-full">
+                <%= feature[:icon] %>
+              </div>
+              <h3 class="mb-2 text-xl font-semibold"><%= feature[:heading] %></h3>
+              <p class="text-muted-foreground"><%= feature[:description] %></p>
+            </div>
+<% end %>
+        </div>
+        <div class="mt-16 flex justify-center">
+            <%= render_button(size: :lg) do %>
+<a href="https://shadcnblocks.com">More Features</a>
+<% end %>
+          </div>
+      </div>
+    </section>

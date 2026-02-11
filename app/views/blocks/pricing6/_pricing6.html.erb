@@ -1,0 +1,52 @@
+<section class="py-32">
+  <div class="container">
+    <div class="mx-auto flex max-w-5xl flex-col items-center gap-6 text-center">
+      <h2 class="text-pretty text-4xl font-semibold lg:text-6xl">
+        Pricing
+      </h2>
+      <p class="text-muted-foreground max-w-md lg:text-xl">
+        Simple pricing with a free 7 day trial.
+      </p>
+      <div class="mx-auto flex w-full flex-col rounded-lg border p-6 sm:w-fit sm:min-w-80">
+        <div class="flex justify-center">
+          <span class="text-lg font-semibold">$</span>
+          <span class="text-6xl font-semibold">29</span>
+          <span class="text-muted-foreground self-end">
+            /mo
+          </span>
+        </div>
+        <div class="my-6">
+          <div>
+            <ul class="flex flex-col gap-3">
+              <li class="flex items-center justify-between gap-2 text-sm font-medium">
+                Unlimited projects <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="inline size-4 shrink-0"><path d="M20 6 9 17l-5-5"></path></svg>
+              </li>
+              <li class="flex items-center justify-between gap-2 text-sm font-medium">
+                Unlimited storage <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="inline size-4 shrink-0"><path d="M20 6 9 17l-5-5"></path></svg>
+              </li>
+              <li class="flex items-center justify-between gap-2 text-sm font-medium">
+                Custom domain <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="inline size-4 shrink-0"><path d="M20 6 9 17l-5-5"></path></svg>
+              </li>
+            </ul>
+            <%= render_separator(class: "my-6") %>
+          </div>
+          <div>
+            <ul class="flex flex-col gap-3">
+              <li class="flex items-center justify-between gap-2 text-sm font-medium">
+                Priority support <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="inline size-4 shrink-0"><path d="M20 6 9 17l-5-5"></path></svg>
+              </li>
+              <li class="flex items-center justify-between gap-2 text-sm font-medium">
+                Advanced analytics <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="inline size-4 shrink-0"><path d="M20 6 9 17l-5-5"></path></svg>
+              </li>
+              <li class="flex items-center justify-between gap-2 text-sm font-medium">
+                Team collaboration <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="inline size-4 shrink-0"><path d="M20 6 9 17l-5-5"></path></svg>
+              </li>
+            </ul>
+            <%= render_separator(class: "my-6") %>
+          </div>
+        </div>
+        <%= render_button("Start free trial") %>
+      </div>
+    </div>
+  </div>
+</section>

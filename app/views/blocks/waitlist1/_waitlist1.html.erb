@@ -1,0 +1,28 @@
+<section class="flex h-full min-h-screen w-full items-center justify-center overflow-hidden py-32">
+  <div class="flex flex-col items-center">
+    <h2 class="relative z-20 py-2 text-center font-sans text-5xl font-semibold tracking-tighter md:py-10 lg:text-8xl">
+      Join the Waitlist
+    </h2>
+    <p class="text-md text-muted-foreground mx-auto max-w-xl text-center lg:text-lg">
+      Lorem ipsum dolor sit amet, consectetur adipiscing elit, sed do
+      eiusmod tempor incididunt ut labore et dolore magna aliqua.
+    </p>
+    <div class="relative z-20 mt-10 flex w-full max-w-md items-center gap-3 rounded-full p-1">
+      <%= render_input(class: "bg-muted h-10 w-full rounded-xl border-none shadow-none", placeholder: "Enter your email", name: "email") %>
+      <%= render_button("Join the Waitlist", class: "h-10 rounded-xl") %>
+    </div>
+    <div class="mt-10 flex items-center gap-2">
+      <span class="inline-flex items-center -space-x-2.5">
+        <span class="inline-flex size-8 items-center justify-center rounded-full border-2 border-background bg-muted text-xs font-medium">A</span>
+        <span class="inline-flex size-8 items-center justify-center rounded-full border-2 border-background bg-muted text-xs font-medium">B</span>
+        <span class="inline-flex size-8 items-center justify-center rounded-full border-2 border-background bg-muted text-xs font-medium">C</span>
+        <span class="inline-flex size-8 items-center justify-center rounded-full border-2 border-background bg-muted text-xs font-medium">D</span>
+        <span class="inline-flex size-8 items-center justify-center rounded-full border-2 border-background bg-muted text-xs font-medium">E</span>
+        <span class="inline-flex size-8 items-center justify-center rounded-full border-2 border-background bg-muted text-xs font-medium">F</span>
+      </span>
+      <p class="text-muted-foreground/80 tracking-tight">
+        +1000 people already joined
+      </p>
+    </div>
+  </div>
+</section>

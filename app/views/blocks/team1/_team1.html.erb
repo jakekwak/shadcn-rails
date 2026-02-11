@@ -1,0 +1,29 @@
+<% members = [
+  { name: "Sarah Chen", role: "CEO & Founder", avatar: "https://deifkwefumgah.cloudfront.net/shadcnblocks/block/avatar-1.webp" },
+  { name: "Marcus Rodriguez", role: "CTO", avatar: "https://deifkwefumgah.cloudfront.net/shadcnblocks/block/avatar-2.webp" },
+  { name: "Emily Watson", role: "Head of Design", avatar: "https://deifkwefumgah.cloudfront.net/shadcnblocks/block/avatar-3.webp" },
+  { name: "David Kim", role: "Lead Engineer", avatar: "https://deifkwefumgah.cloudfront.net/shadcnblocks/block/avatar-4.webp" },
+  { name: "Lisa Thompson", role: "Product Manager", avatar: "https://deifkwefumgah.cloudfront.net/shadcnblocks/block/avatar-5.webp" },
+  { name: "Alex Johnson", role: "UX Designer", avatar: "https://deifkwefumgah.cloudfront.net/shadcnblocks/block/avatar-6.webp" }
+] %>
+<section class="py-32">
+  <div class="container flex flex-col items-center text-center">
+    <h2 class="my-6 text-pretty text-2xl font-bold lg:text-4xl">
+      Team
+    </h2>
+    <p class="text-muted-foreground mb-8 max-w-3xl lg:text-xl">
+      Our diverse team of experts brings together decades of experience in design, engineering, and product development.
+    </p>
+  </div>
+  <div class="container mt-16 grid gap-x-8 gap-y-16 md:grid-cols-2 lg:grid-cols-3">
+    <% members.each do |member| %>
+      <div class="flex flex-col items-center">
+        <span class="relative flex size-24 shrink-0 overflow-hidden rounded-full mb-4">
+          <img src="<%= member[:avatar] %>" alt="<%= member[:name] %>" class="aspect-square size-full object-cover" />
+        </span>
+        <p class="text-center font-medium"><%= member[:name] %></p>
+        <p class="text-muted-foreground text-center"><%= member[:role] %></p>
+      </div>
+    <% end %>
+  </div>
+</section>

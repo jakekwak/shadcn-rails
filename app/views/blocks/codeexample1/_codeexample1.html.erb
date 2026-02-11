@@ -1,0 +1,49 @@
+<section class="py-32">
+      <div class="container">
+        <div class="grid place-items-center gap-10 lg:grid-cols-2 lg:gap-0">
+          <div class="flex flex-col gap-6 lg:pr-20">
+            <span class="text-muted-foreground text-lg">
+              ./database-setup.sh
+            </span>
+            <h2 class="text-4xl font-bold tracking-tight md:text-5xl">
+              YOUR DATA.
+              <br />
+              <span class="text-muted-foreground">YOUR QUERIES.</span>
+            </h2>
+            <p class="text-muted-foreground md:text-lg">
+              Connect faster and manipulate your data with database APIs and
+              ORMs that are powerful but also easy to use.
+            </p>
+            <%= render_button(class: "w-fit", size: :lg) do %>
+              Get started
+              <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="h-4 w-4"><path d="M7 7h10v10"></path><path d="M7 17 17 7"></path></svg>
+            <% end %>
+          </div>
+          <div class="flex w-full flex-col gap-1 overflow-hidden">
+            <%= render_code_block do %>
+              <% code_block_item(
+                language: "javascript",
+                filename: "setup.js",
+                code: "import { createClient } from '@database/sdk'\n\nconst client = createClient({\n  url: process.env.DATABASE_URL,\n  authToken: process.env.DATABASE_AUTH_TOKEN,\n})\n\nconst result = await client.execute({\n  sql: 'SELECT * FROM users WHERE id = ?',\n  args: [1],\n})\n\nconsole.log(result.rows)",
+                active: true
+              ) %>
+              <% code_block_item(
+                language: "python",
+                filename: "setup.py",
+                code: "import database_sdk\n\nclient = database_sdk.create_client(\n    url=os.environ[\"DATABASE_URL\"],\n    auth_token=os.environ[\"DATABASE_AUTH_TOKEN\"],\n)\n\nresult = client.execute(\n    \"SELECT * FROM users WHERE id = ?\",\n    [1],\n)\n\nprint(result.rows)"
+              ) %>
+              <% code_block_item(
+                language: "go",
+                filename: "setup.go",
+                code: "package main\n\nimport (\n\t\"fmt\"\n\t\"os\"\n\n\tdb \"github.com/database/sdk-go\"\n)\n\nfunc main() {\n\tclient, err := db.NewClient(db.Config{\n\t\tURL:       os.Getenv(\"DATABASE_URL\"),\n\t\tAuthToken: os.Getenv(\"DATABASE_AUTH_TOKEN\"),\n\t})\n\tif err != nil {\n\t\tpanic(err)\n\t}\n\n\tresult, _ := client.Execute(\"SELECT * FROM users WHERE id = ?\", 1)\n\tfmt.Println(result.Rows)\n}"
+              ) %>
+              <% code_block_item(
+                language: "ruby",
+                filename: "setup.rb",
+                code: "require 'database_sdk'\n\nclient = DatabaseSDK.create_client(\n  url: ENV['DATABASE_URL'],\n  auth_token: ENV['DATABASE_AUTH_TOKEN']\n)\n\nresult = client.execute(\n  'SELECT * FROM users WHERE id = ?',\n  [1]\n)\n\nputs result.rows"
+              ) %>
+            <% end %>
+          </div>
+        </div>
+      </div>
+    </section>

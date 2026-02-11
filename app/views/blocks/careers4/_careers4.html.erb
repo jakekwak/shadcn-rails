@@ -1,0 +1,50 @@
+<section class="py-32">
+      <div class="container">
+        <div class="mx-auto max-w-xl">
+          <div class="text-center lg:text-left">
+            <h1 class="text-left text-3xl font-medium md:text-4xl">
+              Job Openings
+            </h1>
+          </div>
+          <div class="mx-auto mt-6 flex flex-col gap-16 md:mt-14">
+            <div class="grid">
+              <h2 class="border-b pb-4 text-xl font-bold">Engineering</h2>
+              <div class="flex items-center justify-between border-b py-4">
+                <a href="#" class="font-semibold hover:underline">Technical Lead</a>
+                <%= render_badge("London", class: "pointer-events-none rounded-full", variant: :outline) %>
+              </div>
+              <div class="flex items-center justify-between border-b py-4">
+                <a href="#" class="font-semibold hover:underline">Senior Backend Engineer</a>
+                <%= render_badge("Remote", class: "pointer-events-none rounded-full", variant: :outline) %>
+              </div>
+              <div class="flex items-center justify-between border-b py-4">
+                <a href="#" class="font-semibold hover:underline">Frontend Developer</a>
+                <%= render_badge("New York", class: "pointer-events-none rounded-full", variant: :outline) %>
+              </div>
+            </div>
+            <div class="grid">
+              <h2 class="border-b pb-4 text-xl font-bold">Design</h2>
+              <div class="flex items-center justify-between border-b py-4">
+                <a href="#" class="font-semibold hover:underline">Visual Designer</a>
+                <%= render_badge("Berlin", class: "pointer-events-none rounded-full", variant: :outline) %>
+              </div>
+              <div class="flex items-center justify-between border-b py-4">
+                <a href="#" class="font-semibold hover:underline">UX Researcher</a>
+                <%= render_badge("Remote", class: "pointer-events-none rounded-full", variant: :outline) %>
+              </div>
+            </div>
+            <div class="grid">
+              <h2 class="border-b pb-4 text-xl font-bold">Marketing</h2>
+              <div class="flex items-center justify-between border-b py-4">
+                <a href="#" class="font-semibold hover:underline">Content Strategist</a>
+                <%= render_badge("San Francisco", class: "pointer-events-none rounded-full", variant: :outline) %>
+              </div>
+              <div class="flex items-center justify-between border-b py-4">
+                <a href="#" class="font-semibold hover:underline">Growth Manager</a>
+                <%= render_badge("London", class: "pointer-events-none rounded-full", variant: :outline) %>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </section>

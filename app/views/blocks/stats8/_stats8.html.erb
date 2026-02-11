@@ -1,0 +1,29 @@
+<% stats = [
+  { id: "stat-1", value: "250%+", label: "average growth in user engagement" },
+  { id: "stat-2", value: "$2.5m", label: "annual savings per enterprise partner" },
+  { id: "stat-3", value: "200+", label: "integrations with top industry platforms" },
+  { id: "stat-4", value: "99.9%", label: "customer satisfaction over the last year" }
+] %>
+<section class="py-32">
+      <div class="container">
+        <div class="flex flex-col gap-4">
+          <h2 class="text-2xl font-bold md:text-4xl">Platform performance insights</h2>
+          <p>Ensuring stability and scalability for all users</p>
+          <a
+            href="https://www.shadcnblocks.com"
+            class="flex items-center gap-1 font-bold hover:underline"
+          >
+            Read the full impact report
+            <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="h-auto w-4"><path d="M5 12h14"></path><path d="m12 5 7 7-7 7"></path></svg>
+          </a>
+        </div>
+        <div class="mt-14 grid gap-x-5 gap-y-8 md:grid-cols-2 lg:grid-cols-4">
+          <% stats.each do |stat| %>
+<div class="flex flex-col gap-5">
+              <div class="text-6xl font-bold"><%= stat[:value] %></div>
+              <p><%= stat[:label] %></p>
+            </div>
+<% end %>
+        </div>
+      </div>
+    </section>

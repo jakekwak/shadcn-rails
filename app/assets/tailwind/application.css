@@ -1,0 +1,137 @@
+@import "tailwindcss";
+@plugin "@tailwindcss/typography";
+@import "../stylesheets/shadcn.css" layer(base);
+@import "./code_block.css";
+
+@source "../../helpers";
+@source "../../javascript";
+@source "../../views";
+
+@custom-variant dark (&:where(.dark, .dark *));
+
+@theme {
+  --font-sans: "Inter var", ui-sans-serif, system-ui, sans-serif, "Apple Color Emoji", "Segoe UI Emoji", "Segoe UI Symbol", "Noto Color Emoji";
+
+  --color-border: hsl(var(--border));
+  --color-input: hsl(var(--input));
+  --color-ring: hsl(var(--ring));
+  --color-background: hsl(var(--background));
+  --color-foreground: hsl(var(--foreground));
+
+  --color-primary: hsl(var(--primary));
+  --color-primary-foreground: hsl(var(--primary-foreground));
+
+  --color-secondary: hsl(var(--secondary));
+  --color-secondary-foreground: hsl(var(--secondary-foreground));
+
+  --color-destructive: hsl(var(--destructive));
+  --color-destructive-foreground: hsl(var(--destructive-foreground));
+
+  --color-success: hsl(var(--success));
+  --color-success-foreground: hsl(var(--success-foreground));
+
+  --color-info: hsl(var(--info));
+  --color-info-foreground: hsl(var(--info-foreground));
+
+  --color-attention: hsl(var(--attention));
+  --color-attention-foreground: hsl(var(--attention-foreground));
+
+  --color-muted: hsl(var(--muted));
+  --color-muted-foreground: hsl(var(--muted-foreground));
+
+  --color-accent: hsl(var(--accent));
+  --color-accent-foreground: hsl(var(--accent-foreground));
+
+  --color-popover: hsl(var(--popover));
+  --color-popover-foreground: hsl(var(--popover-foreground));
+
+  --color-card: hsl(var(--card));
+  --color-card-foreground: hsl(var(--card-foreground));
+
+  --color-pink: hsl(var(--pink));
+
+  --radius-lg: var(--radius);
+  --radius-md: calc(var(--radius) - 2px);
+  --radius-sm: calc(var(--radius) - 4px);
+
+  --animate-accordion-down: accordion-down 0.2s ease-out;
+  --animate-accordion-up: accordion-up 0.2s ease-out;
+
+  @keyframes accordion-down {
+    from { height: 0; }
+    to { height: var(--radix-accordion-content-height); }
+  }
+
+  @keyframes accordion-up {
+    from { height: var(--radix-accordion-content-height); }
+    to { height: 0; }
+  }
+}
+
+@layer base {
+  .container {
+    margin-left: auto;
+    margin-right: auto;
+    padding-left: 2rem;
+    padding-right: 2rem;
+    width: 100%;
+  }
+
+  :root {
+    --pink: 301 98% 50% 0.88;
+  }
+}
+
+article.documentation h1 {
+  @apply scroll-m-20 text-4xl font-bold tracking-tight;
+}
+
+article.documentation p + h1 {
+  @apply mt-12;
+}
+article.documentation h2 {
+  @apply scroll-m-20 text-3xl font-bold tracking-tight my-8;
+}
+
+article.documentation h3 {
+  @apply scroll-m-20 text-2xl font-bold tracking-tight my-4;
+}
+
+article.documentation h4 {
+  @apply scroll-m-20 text-xl font-bold tracking-tight my-2;
+}
+
+article.documentation subtitle {
+  @apply text-lg text-muted-foreground;
+}
+article.documentation p {
+  @apply leading-7 [&:not(:first-child)]:mt-6;
+}
+
+article.documentation :where(code):not(:where([class~="not-prose"] *)):before {
+  content: "";
+}
+
+article.documentation :where(code):not(:where([class~="not-prose"] *)):after {
+  content: "";
+}
+
+article.documentation p a {
+  @apply underline hover:text-pink;
+}
+
+article.documentation pre {
+  @apply max-h-[650px] overflow-x-auto rounded-lg border bg-zinc-950 dark:bg-zinc-900 text-white py-4 px-8 rounded-lg my-4;
+}
+
+article.documentation p > code {
+  @apply text-white bg-black p-1 rounded;
+}
+
+.hide-scrollbar {
+  -ms-overflow-style: none;
+  scrollbar-width: none;
+}
+.hide-scrollbar::-webkit-scrollbar {
+  display: none;
+}

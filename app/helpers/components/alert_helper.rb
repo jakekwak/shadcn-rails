@@ -1,5 +1,5 @@
 module Components::AlertHelper
-  def render_alert(title:, description: nil, variant: :default, icon: true, &block)
+  def render_alert(title:, description: nil, variant: :default, icon: true, custom_icon: nil, &block)
     alert_classes = case variant.to_sym
     when :default
       "[&>svg]:text-foreground bg-background text-foreground"
@@ -13,6 +13,6 @@ module Components::AlertHelper
       "border-attention/50 text-attention dark:border-attention [&>svg]:text-attention"
     end
     content = (capture(&block) if block) || description
-    render "components/ui/alert", title:, content:, alert_classes:, variant:, icon:
+    render "components/ui/alert", title:, content:, alert_classes:, variant:, icon:, custom_icon:
   end
 end

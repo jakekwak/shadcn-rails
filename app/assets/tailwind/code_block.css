@@ -1,0 +1,98 @@
+/* Rouge syntax highlighting - Monokai-inspired dark theme */
+.code-block pre code {
+  color: #f8f8f2;
+}
+
+.code-block .highlight .c,
+.code-block .highlight .ch,
+.code-block .highlight .cd,
+.code-block .highlight .cm,
+.code-block .highlight .cpf,
+.code-block .highlight .c1,
+.code-block .highlight .cs {
+  color: #75715e;
+}
+
+.code-block .highlight .k,
+.code-block .highlight .kc,
+.code-block .highlight .kd,
+.code-block .highlight .kn,
+.code-block .highlight .kp,
+.code-block .highlight .kr,
+.code-block .highlight .kt {
+  color: #66d9ef;
+}
+
+.code-block .highlight .n,
+.code-block .highlight .nb,
+.code-block .highlight .no,
+.code-block .highlight .ni,
+.code-block .highlight .ne,
+.code-block .highlight .nn,
+.code-block .highlight .nx {
+  color: #f8f8f2;
+}
+
+.code-block .highlight .nf,
+.code-block .highlight .fm {
+  color: #a6e22e;
+}
+
+.code-block .highlight .nc,
+.code-block .highlight .nd {
+  color: #a6e22e;
+}
+
+.code-block .highlight .na {
+  color: #a6e22e;
+}
+
+.code-block .highlight .s,
+.code-block .highlight .sa,
+.code-block .highlight .sb,
+.code-block .highlight .sc,
+.code-block .highlight .dl,
+.code-block .highlight .sd,
+.code-block .highlight .s2,
+.code-block .highlight .se,
+.code-block .highlight .sh,
+.code-block .highlight .si,
+.code-block .highlight .sx,
+.code-block .highlight .sr,
+.code-block .highlight .s1,
+.code-block .highlight .ss {
+  color: #e6db74;
+}
+
+.code-block .highlight .o,
+.code-block .highlight .ow {
+  color: #f92672;
+}
+
+.code-block .highlight .p {
+  color: #f8f8f2;
+}
+
+.code-block .highlight .mi,
+.code-block .highlight .mf,
+.code-block .highlight .mh,
+.code-block .highlight .mo,
+.code-block .highlight .il {
+  color: #ae81ff;
+}
+
+.code-block .highlight .gd {
+  color: #f92672;
+}
+
+.code-block .highlight .gi {
+  color: #a6e22e;
+}
+
+.code-block .highlight .ge {
+  font-style: italic;
+}
+
+.code-block .highlight .gs {
+  font-weight: bold;
+}

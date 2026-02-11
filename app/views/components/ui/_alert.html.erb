@@ -2,6 +2,9 @@
   role="alert"
   class="<%= alert_classes %> relative w-full rounded-lg border p-4 [&:has(svg)]:pl-11 [&>svg+div]:translate-y-[-3px] [&>svg]:absolute [&>svg]:left-4 [&>svg]:top-4">
   <!--prettier-ignore-->
+  <% if custom_icon.present? %>
+  <%= custom_icon %>
+  <% else %>
   <% case variant.to_sym %>
   <% when :default %>
   <svg
@@ -62,6 +65,7 @@
       y2="16"></line>
   </svg>
 <% end if icon %>
+<% end %>
 <h5 class="mb-1 font-medium leading-none tracking-tight"><%= title %></h5>
 <div class="text-sm [&_p]:leading-relaxed"><%= content %></div>
 </div>

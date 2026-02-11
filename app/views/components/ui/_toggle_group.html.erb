@@ -1,0 +1,9 @@
+<%
+  group_classes = tw("inline-flex gap-1 items-center", options[:class])
+%>
+<div role="group"
+  class="<%= group_classes %>"
+  data-controller="ui--toggle-group"
+  data-ui--toggle-group-type-value="<%= type %>">
+  <%= content %>
+</div>

@@ -13,7 +13,7 @@ Gem::Specification.new do |spec|
   spec.description = "This gem is a documentation site and gem that will copy components from the shadcn-ui library into a Ruby on Rails application."
   spec.homepage = "https://github.com/aviflombaum/shadcn-rails"
   spec.license = "MIT"
-  spec.required_ruby_version = ">= 2.6.0"
+  spec.required_ruby_version = ">= 3.2.0"
 
   spec.metadata["homepage_uri"] = spec.homepage
   spec.metadata["source_code_uri"] = "https://github.com/aviflombaum/shadcn-rails"
@@ -32,8 +32,8 @@ Gem::Specification.new do |spec|
   spec.require_paths = ["lib"]
 
   # Uncomment to register a new dependency of your gem
-  spec.add_dependency "tailwindcss-rails", "< 4.0"
-  spec.add_dependency "tailwind_merge", "~> 0.12"
+  spec.add_dependency "tailwindcss-rails", ">= 4.0"
+  spec.add_dependency "tailwind_merge", ">= 1.0"
 
   # For more information and examples about making a new gem, check out our
   # guide at: https://bundler.io/guides/creating_gem.html

@@ -1,0 +1,50 @@
+<% features = [
+  { id: "feature-1", heading: "Modern Design", description: "Clean and intuitive interface built with the latest design principles. Optimized for the best user experience.", image: "https://deifkwefumgah.cloudfront.net/shadcnblocks/block/placeholder-1.svg", url: "https://shadcnblocks.com" },
+  { id: "feature-2", heading: "Responsive Layout", description: "Fully responsive design that works seamlessly across all devices and screen sizes. Perfect for any platform.", image: "https://deifkwefumgah.cloudfront.net/shadcnblocks/block/placeholder-2.svg", url: "https://shadcnblocks.com" },
+  { id: "feature-3", heading: "Easy Integration", description: "Simple integration process with comprehensive documentation and dedicated support team.", image: "https://deifkwefumgah.cloudfront.net/shadcnblocks/block/placeholder-3.svg", url: "https://shadcnblocks.com" },
+  { id: "feature-4", heading: "Advanced Analytics", description: "Powerful analytics tools to help you understand your users and make data-driven decisions.", image: "https://deifkwefumgah.cloudfront.net/shadcnblocks/block/placeholder-4.svg", url: "https://shadcnblocks.com" }
+] %>
+<section class="py-32">
+      <div class="container">
+        <div class="mb-8 lg:max-w-sm">
+          <h2 class="mb-3 text-3xl font-semibold md:mb-4 md:text-4xl lg:mb-6">
+            Powerful Features
+          </h2>
+          <p class="text-muted-foreground mb-8 lg:text-lg">
+              Discover the powerful features that make our platform stand out from the rest. Built with the latest technology and designed for maximum productivity.
+            </p>
+          <%= render_button(variant: :link) do %>
+<a
+                href="https://shadcnblocks.com"
+                class="group flex items-center font-medium md:text-base lg:text-lg"
+              >
+                Book a demo
+                <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="size-4"><path d="M5 12h14"></path><path d="m12 5 7 7-7 7"></path></svg>
+              </a>
+<% end %>
+        </div>
+        <div class="grid gap-6 md:grid-cols-2 lg:gap-8">
+          <% features.each do |feature| %>
+<div
+              class="border-border flex flex-col overflow-clip rounded-xl border"
+            >
+              <a href="<%= feature[:url] %>">
+                <img
+                  src="<%= feature[:image] %>"
+                  alt="<%= feature[:heading] %>"
+                  class="aspect-16/9 h-full w-full object-cover object-center transition-opacity hover:opacity-80"
+                />
+              </a>
+              <div class="px-6 py-8 md:px-8 md:py-10 lg:px-10 lg:py-12">
+                <h3 class="mb-3 text-lg font-semibold md:mb-4 md:text-2xl lg:mb-6">
+                  <%= feature[:heading] %>
+                </h3>
+                <p class="text-muted-foreground lg:text-lg">
+                  <%= feature[:description] %>
+                </p>
+              </div>
+            </div>
+<% end %>
+        </div>
+      </div>
+    </section>

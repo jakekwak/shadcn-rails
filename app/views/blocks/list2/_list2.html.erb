@@ -1,0 +1,47 @@
+<% items = [
+  { title: "Industry Recognition", category: "Achievement", description: "Outstanding Performance Award.", link: "#" },
+  { title: "Excellence Award", category: "Recognition", description: "Best in Category Winner.", link: "#" },
+  { title: "Innovation Prize", category: "Technology", description: "Breakthrough Solution of the Year.", link: "#" },
+  { title: "Customer Success", category: "Service", description: "Top-Rated Solution Provider.", link: "#" },
+  { title: "Global Leadership", category: "Management", description: "Executive Team of the Year.", link: "#" },
+  { title: "Sustainability Impact", category: "Environmental", description: "Green Initiative Excellence.", link: "#" }
+] %>
+<section class="py-32">
+      <div class="container px-0 md:px-8">
+        <h1 class="mb-10 px-4 text-3xl font-semibold md:mb-14 md:text-4xl">
+          Our Achievements & Recognition
+        </h1>
+        <div class="flex flex-col">
+          <%= render_separator() %>
+          <% items.each do |item| %>
+<React.Fragment>
+              <div class="grid items-center gap-4 px-4 py-5 md:grid-cols-4">
+                <div class="order-2 flex items-center gap-2 md:order-none">
+                  <span class="bg-muted flex h-14 w-16 shrink-0 items-center justify-center rounded-md">
+                    <%= item[:icon] %>
+                  </span>
+                  <div class="flex flex-col gap-1">
+                    <h3 class="font-semibold"><%= item[:title] %></h3>
+                    <p class="text-muted-foreground text-sm">
+                      <%= item[:category] %>
+                    </p>
+                  </div>
+                </div>
+                <p class="order-1 text-2xl font-semibold md:order-none md:col-span-2">
+                  <%= item[:description] %>
+                </p>
+                <%= render_button(variant: :outline) do %>
+<a
+                    class="order-3 ml-auto w-fit gap-2 md:order-none"
+                    href="<%= item[:link] %>"
+                  >
+                    <span>View project</span>
+                    <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="h-4 w-4"><path d="M5 12h14"></path><path d="m12 5 7 7-7 7"></path></svg>
+                  </a>
+<% end %>
+              </div>
+              <%= render_separator() %>
+<% end %>
+        </div>
+      </div>
+    </section>

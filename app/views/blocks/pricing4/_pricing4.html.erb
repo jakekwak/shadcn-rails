@@ -1,0 +1,103 @@
+<section class="py-32">
+  <div class="container">
+    <div class="mx-auto flex max-w-7xl flex-col gap-6">
+      <h2 class="text-pretty text-4xl font-bold lg:text-6xl">
+        Pricing
+      </h2>
+      <div class="flex flex-col justify-between gap-10 md:flex-row">
+        <p class="text-muted-foreground max-w-3xl lg:text-xl">
+          Check out our affordable pricing plans.
+        </p>
+        <div class="bg-muted flex h-11 w-fit shrink-0 items-center rounded-md p-1 text-lg">
+          <div class="bg-background h-full rounded-md px-7 flex items-center">
+            <span class="text-primary font-semibold">Monthly</span>
+          </div>
+          <div class="h-full rounded-md px-7 flex items-center">
+            <span class="text-muted-foreground font-semibold">Yearly</span>
+          </div>
+        </div>
+      </div>
+      <div class="flex w-full flex-col items-stretch gap-6 md:flex-row">
+        <div class="flex w-full flex-col rounded-lg border p-6 text-left">
+          <%= render_badge("Free", class: "mb-8 block w-fit uppercase") %>
+          <span class="text-4xl font-medium">$0</span>
+          <p class="text-muted-foreground invisible">Per month</p>
+          <%= render_separator(class: "my-6") %>
+          <div class="flex h-full flex-col justify-between gap-20">
+            <ul class="text-muted-foreground space-y-4">
+              <li class="flex items-center gap-2">
+                <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="size-4"><path d="M20 6 9 17l-5-5"></path></svg>
+                <span>1 project</span>
+              </li>
+              <li class="flex items-center gap-2">
+                <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="size-4"><path d="M20 6 9 17l-5-5"></path></svg>
+                <span>Basic analytics</span>
+              </li>
+              <li class="flex items-center gap-2">
+                <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="size-4"><path d="M20 6 9 17l-5-5"></path></svg>
+                <span>Community support</span>
+              </li>
+            </ul>
+            <%= render_button("Get Started", class: "w-full") %>
+          </div>
+        </div>
+
+        <div class="flex w-full flex-col rounded-lg border bg-muted p-6 text-left">
+          <%= render_badge("Pro", class: "mb-8 block w-fit uppercase") %>
+          <span class="text-4xl font-medium">$29</span>
+          <p class="text-muted-foreground">Per month</p>
+          <%= render_separator(class: "my-6") %>
+          <div class="flex h-full flex-col justify-between gap-20">
+            <ul class="text-muted-foreground space-y-4">
+              <li class="flex items-center gap-2">
+                <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="size-4"><path d="M20 6 9 17l-5-5"></path></svg>
+                <span>Unlimited projects</span>
+              </li>
+              <li class="flex items-center gap-2">
+                <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="size-4"><path d="M20 6 9 17l-5-5"></path></svg>
+                <span>Advanced analytics</span>
+              </li>
+              <li class="flex items-center gap-2">
+                <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="size-4"><path d="M20 6 9 17l-5-5"></path></svg>
+                <span>Priority support</span>
+              </li>
+              <li class="flex items-center gap-2">
+                <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="size-4"><path d="M20 6 9 17l-5-5"></path></svg>
+                <span>Custom domain</span>
+              </li>
+            </ul>
+            <%= render_button("Purchase", class: "w-full") %>
+          </div>
+        </div>
+
+        <div class="flex w-full flex-col rounded-lg border p-6 text-left">
+          <%= render_badge("Elite", class: "mb-8 block w-fit uppercase") %>
+          <span class="text-4xl font-medium">$59</span>
+          <p class="text-muted-foreground">Per month</p>
+          <%= render_separator(class: "my-6") %>
+          <div class="flex h-full flex-col justify-between gap-20">
+            <ul class="text-muted-foreground space-y-4">
+              <li class="flex items-center gap-2">
+                <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="size-4"><path d="M20 6 9 17l-5-5"></path></svg>
+                <span>Everything in Pro</span>
+              </li>
+              <li class="flex items-center gap-2">
+                <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="size-4"><path d="M20 6 9 17l-5-5"></path></svg>
+                <span>Dedicated account manager</span>
+              </li>
+              <li class="flex items-center gap-2">
+                <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="size-4"><path d="M20 6 9 17l-5-5"></path></svg>
+                <span>SLA guarantee</span>
+              </li>
+              <li class="flex items-center gap-2">
+                <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="size-4"><path d="M20 6 9 17l-5-5"></path></svg>
+                <span>Custom integrations</span>
+              </li>
+            </ul>
+            <%= render_button("Purchase", class: "w-full") %>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</section>
