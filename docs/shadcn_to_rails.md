@@ -4,45 +4,40 @@ React shadcn/ui 컴포넌트(TSX)를 Rails ERB + Helper 형식으로 변환하�
 
 ## 사용법
 
-### 기본: shadcn 레지스트리에서 가져오기
+입력 소스를 자동 판별합니다 — GitHub URL, 로컬 파일, 레지스트리 이름 모두 같은 방식으로 사용합니다.
 
 ```bash
-# 블록 변환
+# shadcn 레지스트리
 python3 bin/shadcn_to_rails login-03
 
-# URL 직접 지정
-python3 bin/shadcn_to_rails --url https://ui.shadcn.com/r/styles/new-york/sidebar-01.json
+# GitHub URL (파일)
+python3 bin/shadcn_to_rails https://github.com/shadcnblocks/shadcn-ui-blocks/blob/master/src/block/about3.tsx
 
-# 의존성 확인만
-python3 bin/shadcn_to_rails login-03 --list-deps
+# GitHub URL (디렉토리 — 내부 .tsx 파일 재귀 탐색)
+python3 bin/shadcn_to_rails https://github.com/user/repo/tree/main/src/block/about3
 
-# 파일 생성 없이 미리보기
-python3 bin/shadcn_to_rails login-03 --dry-run
+# 로컬 파일
+python3 bin/shadcn_to_rails ../shadcn-studio/src/block/about3.tsx
+
+# 로컬 디렉토리
+python3 bin/shadcn_to_rails ../shadcn-studio/src/block/about3/
+
+# 여러 파일
+python3 bin/shadcn_to_rails src/page.tsx src/components/form.tsx
+
+# 옵션
+python3 bin/shadcn_to_rails login-03 --dry-run       # 미리보기
+python3 bin/shadcn_to_rails login-03 --list-deps      # 의존성 확인
+python3 bin/shadcn_to_rails about3.tsx --output-dir app/views/custom/
 ```
 
-### 로컬 TSX 파일 직접 변환
-
-```bash
-# 단일 파일
-python3 bin/shadcn_to_rails my-component --file path/to/component.tsx
-
-# 여러 파일 (page + sub-components)
-python3 bin/shadcn_to_rails my-block --file src/page.tsx --file src/components/form.tsx
-
-# 디렉토리 전체 (내부 .tsx/.jsx 파일 재귀 탐색)
-python3 bin/shadcn_to_rails my-block --file src/my-block/
-
-# 출력 경로 지정
-python3 bin/shadcn_to_rails my-block --file src/page.tsx --output-dir app/views/custom/
-```
+컴포넌트 이름은 소스에서 자동 추출됩니다 (파일명, 디렉토리명, URL 마지막 경로).
 
 ### 브라우저에서 확인
 
-변환된 블록은 개발 서버에서 바로 확인할 수 있습니다:
-
 ```bash
 bin/rails server
-# http://localhost:3000/blocks/my-block
+# http://localhost:3000/blocks/about3
 ```
 
 라우트: `GET /blocks/:block` → `ApplicationController#block` → `layouts/block` 레이아웃 사용

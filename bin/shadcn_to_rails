@@ -3,18 +3,27 @@
 shadcn_to_rails: Convert React shadcn/ui components, blocks, and templates to Rails ERB + Helper.
 
 Usage:
-    python bin/shadcn_to_rails <component-name> [options]
+    python bin/shadcn_to_rails <source> [options]
+
+입력 자동 판별:
+    - GitHub URL  → GitHub에서 TSX 가져오기
+    - 로컬 파일/디렉토리 → 로컬 TSX 변환
+    - 그 외       → shadcn 레지스트리 이름으로 간주
 
 Examples:
-    # Registry API에서 가져오기
+    # shadcn 레지스트리
     python bin/shadcn_to_rails login-03
-    python bin/shadcn_to_rails button
-    python bin/shadcn_to_rails --url https://ui.shadcn.com/r/styles/new-york/sidebar-01.json
 
-    # 로컬 TSX 파일 직접 변환
-    python bin/shadcn_to_rails my-component --file src/page.tsx
-    python bin/shadcn_to_rails my-block --file src/page.tsx --file src/components/form.tsx
-    python bin/shadcn_to_rails my-block --file src/            # 디렉토리 내 모든 .tsx
+    # GitHub URL (파일 또는 디렉토리)
+    python bin/shadcn_to_rails https://github.com/shadcnblocks/shadcn-ui-blocks/blob/master/src/block/about3.tsx
+    python bin/shadcn_to_rails https://github.com/shadcnblocks/shadcn-ui-blocks/tree/master/src/block/about3
+
+    # 로컬 파일 또는 디렉토리
+    python bin/shadcn_to_rails ../shadcn-studio/src/component/about3.tsx
+    python bin/shadcn_to_rails ../shadcn-studio/src/block/about3/
+
+    # 여러 소스 (추가 입력)
+    python bin/shadcn_to_rails src/page.tsx src/components/form.tsx
 """
 
 import argparse
@@ -227,6 +236,133 @@ def fetch_registry(name, style="new-york", url=None):
         return None
 
 
+def fetch_github(github_urls):
+    """Fetch TSX/JSX files from GitHub URLs.
+
+    Supports:
+      - File URL:      https://github.com/user/repo/blob/branch/path/file.tsx
+      - Directory URL: https://github.com/user/repo/tree/branch/path/dir
+      - Raw URL:       https://raw.githubusercontent.com/user/repo/branch/path/file.tsx
+
+    Returns registry-compatible data dict, or None on failure.
+    """
+    collected = []  # list of (filename, content, original_url)
+
+    for url in github_urls:
+        url = url.rstrip("/")
+
+        # Convert blob URL → raw URL
+        # https://github.com/user/repo/blob/branch/path → https://raw.githubusercontent.com/user/repo/branch/path
+        if "github.com" in url and "/blob/" in url:
+            raw_url = url.replace("github.com", "raw.githubusercontent.com").replace("/blob/", "/")
+            print(f"  Fetching: {url}")
+            try:
+                req = urllib.request.Request(raw_url, headers={"User-Agent": "shadcn-to-rails/1.0"})
+                with urllib.request.urlopen(req) as resp:
+                    content = resp.read().decode("utf-8")
+                filename = raw_url.split("/")[-1]
+                collected.append((filename, content, url))
+                print(f"  Loaded: {filename}")
+            except Exception as e:
+                print(f"  ERROR fetching {url}: {e}")
+                continue
+
+        # Directory URL → use GitHub API to list files, then fetch each
+        elif "github.com" in url and "/tree/" in url:
+            # https://github.com/user/repo/tree/branch/path → API: /repos/user/repo/contents/path?ref=branch
+            parts = url.replace("https://github.com/", "").split("/")
+            user, repo = parts[0], parts[1]
+            # parts[2] == "tree", parts[3] == branch, parts[4:] == path
+            branch = parts[3]
+            dir_path = "/".join(parts[4:]) if len(parts) > 4 else ""
+            api_url = f"https://api.github.com/repos/{user}/{repo}/contents/{dir_path}?ref={branch}"
+            print(f"  Listing directory: {url}")
+            try:
+                req = urllib.request.Request(api_url, headers={
+                    "User-Agent": "shadcn-to-rails/1.0",
+                    "Accept": "application/vnd.github.v3+json",
+                })
+                with urllib.request.urlopen(req) as resp:
+                    items = json.loads(resp.read().decode("utf-8"))
+            except Exception as e:
+                print(f"  ERROR listing {api_url}: {e}")
+                continue
+
+            # Recursively collect .tsx/.jsx files
+            file_items = []
+            dir_items = []
+            for item in items:
+                if item["type"] == "file" and (item["name"].endswith(".tsx") or item["name"].endswith(".jsx")):
+                    file_items.append(item)
+                elif item["type"] == "dir":
+                    dir_items.append(item)
+
+            # Fetch files in this directory
+            for item in file_items:
+                raw_url = item.get("download_url", "")
+                if not raw_url:
+                    continue
+                try:
+                    req = urllib.request.Request(raw_url, headers={"User-Agent": "shadcn-to-rails/1.0"})
+                    with urllib.request.urlopen(req) as resp:
+                        content = resp.read().decode("utf-8")
+                    collected.append((item["name"], content, raw_url))
+                    print(f"  Loaded: {item['name']}")
+                except Exception as e:
+                    print(f"  ERROR fetching {item['name']}: {e}")
+
+            # Recurse into subdirectories
+            for item in dir_items:
+                sub_url = f"https://github.com/{user}/{repo}/tree/{branch}/{item['path']}"
+                sub_data = fetch_github([sub_url])
+                if sub_data:
+                    for f in sub_data.get("files", []):
+                        collected.append((Path(f["path"]).name, f["content"], f["path"]))
+
+        # Already a raw URL
+        elif "raw.githubusercontent.com" in url:
+            print(f"  Fetching: {url}")
+            try:
+                req = urllib.request.Request(url, headers={"User-Agent": "shadcn-to-rails/1.0"})
+                with urllib.request.urlopen(req) as resp:
+                    content = resp.read().decode("utf-8")
+                filename = url.split("/")[-1]
+                collected.append((filename, content, url))
+                print(f"  Loaded: {filename}")
+            except Exception as e:
+                print(f"  ERROR fetching {url}: {e}")
+                continue
+        else:
+            print(f"  WARNING: Unsupported URL format: {url}")
+
+    if not collected:
+        print("  ERROR: No files fetched from GitHub.")
+        return None
+
+    # Sort: page.tsx/index.tsx first
+    def sort_key(item):
+        stem = Path(item[0]).stem.lower()
+        return (0, item[0]) if stem in ("page", "index") else (1, item[0])
+    collected.sort(key=sort_key)
+
+    files = []
+    for i, (filename, content, src) in enumerate(collected):
+        stem = Path(filename).stem.lower()
+        if stem in ("page", "index"):
+            file_type = "registry:page"
+        elif i == 0:
+            file_type = "registry:page"
+        else:
+            file_type = "registry:component"
+        files.append({"path": filename, "content": content, "type": file_type})
+
+    return {
+        "type": "registry:block",
+        "description": f"GitHub: {', '.join(u for _, _, u in collected)}",
+        "files": files,
+    }
+
+
 def load_local_files(file_paths):
     """Build registry-compatible data from local TSX files.
 
@@ -329,6 +465,79 @@ def extract_imports(tsx_content):
     return {"icons": icons, "components": components}
 
 
+def extract_props_defaults(tsx_content):
+    """Extract React component props with their default values.
+
+    Parses patterns like:
+      const Comp = ({ title = "About Us", count = 5 }: Props) => { ... }
+      function Comp({ title = "About Us" }: Props) { ... }
+
+    Also extracts const default arrays/objects defined before the component.
+
+    Returns a dict: { "title": '"About Us"', "count": "5", ... }
+    """
+    defaults = {}
+
+    # Match destructured props with defaults in arrow function or regular function
+    # Pattern: ({ prop1 = value1, prop2 = value2, ... }: Type) =>
+    # or: function Name({ prop1 = value1, ... }: Type)
+    prop_block_match = re.search(
+        r'(?:const\s+\w+\s*=\s*\(\s*\{|function\s+\w+\s*\(\s*\{)(.*?)\}\s*(?::\s*\w+(?:\s*=\s*\{\})?)?\s*\)\s*(?:=>)?\s*\{',
+        tsx_content, flags=re.DOTALL
+    )
+    if not prop_block_match:
+        return defaults
+
+    props_str = prop_block_match.group(1)
+
+    # Parse simple scalar defaults: name = "string" or name = number
+    for m in re.finditer(r'(\w+)\s*=\s*("(?:[^"\\]|\\.)*")', props_str):
+        defaults[m.group(1)] = m.group(2)
+    for m in re.finditer(r'(\w+)\s*=\s*(\d+(?:\.\d+)?)\s*[,}]', props_str):
+        defaults[m.group(1)] = m.group(2)
+
+    # Parse object defaults: name = { key: "val", ... }
+    # Use bracket matching for nested objects
+    for m in re.finditer(r'(\w+)\s*=\s*\{', props_str):
+        prop_name = m.group(1)
+        start = m.end() - 1  # position of opening {
+        depth = 0
+        pos = start
+        while pos < len(props_str):
+            ch = props_str[pos]
+            if ch == '{':
+                depth += 1
+            elif ch == '}':
+                depth -= 1
+                if depth == 0:
+                    obj_str = props_str[start:pos + 1]
+                    defaults[prop_name] = obj_str.strip()
+                    break
+            elif ch in ('"', "'"):
+                quote = ch
+                pos += 1
+                while pos < len(props_str) and props_str[pos] != quote:
+                    if props_str[pos] == '\\':
+                        pos += 1
+                    pos += 1
+            pos += 1
+
+    # Parse defaults referencing const variables (e.g., companies = defaultCompanies)
+    for m in re.finditer(r'(\w+)\s*=\s*([a-z]\w*)\s*[,}]', props_str):
+        prop_name = m.group(1)
+        var_name = m.group(2)
+        if prop_name not in defaults:
+            # Look up the const definition
+            const_match = re.search(
+                rf'const\s+{re.escape(var_name)}\s*(?::\s*[^=]+)?\s*=\s*(\[.*?\]);',
+                tsx_content, flags=re.DOTALL
+            )
+            if const_match:
+                defaults[prop_name] = const_match.group(1).strip()
+
+    return defaults
+
+
 def extract_jsx_body(tsx_content):
     """Extract the JSX return body from a TSX component."""
     # Try to find: return ( ... )
@@ -370,13 +579,261 @@ def extract_jsx_body(tsx_content):
 # Transformer
 # ---------------------------------------------------------------------------
 
-def transform_jsx_to_erb(jsx, icons=None, partial_prefix=""):
+def _parse_js_object(obj_str):
+    """Parse a simple JS object literal into a Python dict.
+
+    Handles: { key: "value", key2: "value2" }
+    Returns dict of string keys → string values.
+    """
+    result = {}
+    # Match key: "value" or key: 'value'
+    for m in re.finditer(r'(\w+)\s*:\s*("(?:[^"\\]|\\.)*"|\'(?:[^\'\\]|\\.)*\')', obj_str):
+        key = m.group(1)
+        val = m.group(2).strip('"').strip("'")
+        result[key] = val
+    return result
+
+
+def _parse_js_array(arr_str):
+    """Parse a simple JS array of objects into a Python list of dicts.
+
+    Handles: [ { key: "val" }, { key: "val2" } ]
+    """
+    result = []
+    # Find each object in the array
+    depth = 0
+    start = None
+    for i, ch in enumerate(arr_str):
+        if ch == '{':
+            if depth == 0:
+                start = i
+            depth += 1
+        elif ch == '}':
+            depth -= 1
+            if depth == 0 and start is not None:
+                result.append(_parse_js_object(arr_str[start:i + 1]))
+                start = None
+    return result
+
+
+def _build_array_locals(props_defaults):
+    """Build ERB local variable assignments for array props.
+
+    Returns a string of <% array = [...] %> to prepend to ERB output.
+    This is kept separate from the JSX transform to avoid ERB tag corruption.
+    """
+    blocks = []
+    for prop_name, default_val in props_defaults.items():
+        if not default_val.lstrip().startswith('['):
+            continue
+        items = _parse_js_array(default_val)
+        if not items:
+            continue
+        ruby_items = []
+        for item in items:
+            pairs = ", ".join(f'{k}: "{v}"' for k, v in item.items())
+            ruby_items.append("  { " + pairs + " }")
+        blocks.append(f"<% {prop_name} = [\n" + ",\n".join(ruby_items) + "\n] %>")
+    return "\n".join(blocks)
+
+
+def _inline_props_defaults(jsx, props_defaults):
+    """Replace simple prop references with their default values.
+
+    For string props: {title} → default string value directly
+    For object props: {obj.key} → default value from parsed object
+    """
+    result = jsx
+
+    for prop_name, default_val in props_defaults.items():
+        if default_val.startswith('"') and default_val.endswith('"'):
+            # Simple string prop: replace {propName} with the default value
+            plain_val = default_val.strip('"')
+            result = re.sub(
+                r'\{' + re.escape(prop_name) + r'\}',
+                plain_val,
+                result
+            )
+            # Also in ERB context: <%= propName %> (if already converted)
+            result = re.sub(
+                r'<%=\s*' + re.escape(prop_name) + r'\s*%>',
+                plain_val,
+                result
+            )
+        elif default_val.startswith('{'):
+            # Object prop: parse and replace {obj.key} references
+            obj = _parse_js_object(default_val)
+            for key, val in obj.items():
+                # In attribute context: attr={obj.key} → attr="value"
+                result = re.sub(
+                    r'(\w+)=\{' + re.escape(prop_name) + r'\.' + re.escape(key) + r'\}',
+                    r'\1="' + val.replace('\\', '\\\\') + '"',
+                    result
+                )
+                # In text context: {obj.key} → value
+                result = re.sub(
+                    r'\{' + re.escape(prop_name) + r'\.' + re.escape(key) + r'\}',
+                    val,
+                    result
+                )
+                # Already-converted ERB: <%= obj.key %> → value
+                result = re.sub(
+                    r'<%=\s*' + re.escape(prop_name) + r'\.' + re.escape(key) + r'\s*%>',
+                    val,
+                    result
+                )
+        elif default_val.lstrip().startswith('['):
+            # Array prop: handled by _build_array_locals() after transform
+            pass
+        else:
+            # Numeric or other simple value
+            result = re.sub(
+                r'\{' + re.escape(prop_name) + r'\}',
+                str(default_val),
+                result
+            )
+
+    return result
+
+
+def _convert_map_to_each(jsx):
+    """Convert JSX .map() iterations to ERB each loops.
+
+    {items.map((item, idx) => (
+      <div key={...}>...</div>
+    ))}
+    →
+    <% items.each do |item| %>
+      <div>...</div>
+    <% end %>
+    """
+    result = jsx
+
+    def replace_map(m):
+        full = m.group(0)
+        array_name = m.group(1)
+        item_var = m.group(2)
+        # idx_var = m.group(3)  # optional index var, usually not needed in ERB
+        body = m.group(4)
+
+        # Remove key={...} attributes (React-specific)
+        body = re.sub(r'\s+key=\{[^}]*\}', '', body)
+
+        # Replace {item.prop} → <%= item[:prop] %> within the body
+        def replace_item_prop(pm):
+            prop = pm.group(1)
+            return f'<%= {item_var}[:{prop}] %>'
+        body = re.sub(rf'\{{{re.escape(item_var)}\.(\w+)\}}', replace_item_prop, body)
+
+        # Replace item.prop in attribute values: attr={item.prop} → attr="<%= item[:prop] %>"
+        def replace_attr_item_prop(pm):
+            attr = pm.group(1)
+            prop = pm.group(2)
+            return f'{attr}="<%= {item_var}[:{prop}] %>"'
+        body = re.sub(rf'(\w+)=\{{{re.escape(item_var)}\.(\w+)\}}', replace_attr_item_prop, body)
+
+        return f'<% {array_name}.each do |{item_var}| %>\n{body.strip()}\n<% end %>'
+
+    # Match: {arrayName.map((item, idx?) => ( ... ))}
+    # Use bracket matching for the outer ( ... )
+    pattern = r'\{(\w+)\.map\(\((\w+)(?:,\s*(\w+))?\)\s*=>\s*\('
+    for m in re.finditer(pattern, result):
+        start = m.end() - 1  # position of opening (
+        depth = 0
+        pos = start
+        while pos < len(result):
+            ch = result[pos]
+            if ch == '(':
+                depth += 1
+            elif ch == ')':
+                depth -= 1
+                if depth == 0:
+                    # Find closing ))} — skip whitespace after )
+                    end = pos + 1
+                    # Skip )} at the end
+                    rest = result[end:].lstrip()
+                    if rest.startswith(')}'):
+                        end = end + (len(result[end:]) - len(result[end:].lstrip())) + 2
+                    body = result[start + 1:pos]
+
+                    # Build replacement
+                    array_name = m.group(1)
+                    item_var = m.group(2)
+                    body_clean = body
+
+                    # Remove key={...}
+                    body_clean = re.sub(r'\s+key=\{[^}]*\}', '', body_clean)
+
+                    # Replace attr={item.prop} → attr="<%= item[:prop] %>" (MUST run before text replacement)
+                    def replace_attr_inner(pm, _item_var=item_var):
+                        attr = pm.group(1)
+                        prop = pm.group(2)
+                        return f'{attr}="<%= {_item_var}[:{prop}] %>"'
+                    body_clean = re.sub(rf'(\w+)=\{{{re.escape(item_var)}\.(\w+)\}}', replace_attr_inner, body_clean)
+
+                    # Replace {item.prop} → <%= item[:prop] %> (text context)
+                    def replace_item_prop_inner(pm, _item_var=item_var):
+                        prop = pm.group(1)
+                        return f'<%= {_item_var}[:{prop}] %>'
+                    body_clean = re.sub(rf'\{{{re.escape(item_var)}\.(\w+)\}}', replace_item_prop_inner, body_clean)
+
+                    replacement = f'<% {array_name}.each do |{item_var}| %>\n{body_clean.strip()}\n<% end %>'
+                    result = result[:m.start()] + replacement + result[end:]
+                    break
+            elif ch in ('"', "'", '`'):
+                quote = ch
+                pos += 1
+                while pos < len(result) and result[pos] != quote:
+                    if result[pos] == '\\':
+                        pos += 1
+                    pos += 1
+            pos += 1
+        break  # Only replace first match, then re-scan (to handle shifted positions)
+
+    # Repeat for additional .map() calls (recursive approach)
+    if re.search(r'\{\w+\.map\(', result):
+        result = _convert_map_to_each(result)
+
+    return result
+
+
+def _convert_object_attr_access(jsx, props_defaults):
+    """Convert remaining object property access in HTML attributes.
+
+    attr={obj.prop} → attr="resolved_value" (if default known)
+    attr={obj.prop} → attr="<%= obj[:prop] %>" (if no default)
+    """
+    result = jsx
+
+    def replace_obj_attr(m):
+        attr = m.group(1)
+        obj_name = m.group(2)
+        prop_name = m.group(3)
+
+        # Try to resolve from props_defaults
+        if obj_name in props_defaults:
+            default_val = props_defaults[obj_name]
+            if default_val.startswith('{'):
+                obj = _parse_js_object(default_val)
+                if prop_name in obj:
+                    return f'{attr}="{obj[prop_name]}"'
+
+        return f'{attr}="<%= {obj_name}[:{prop_name}] %>"'
+
+    result = re.sub(r'(\w+)=\{(\w+)\.(\w+)\}', replace_obj_attr, result)
+    return result
+
+
+def transform_jsx_to_erb(jsx, icons=None, partial_prefix="", props_defaults=None):
     """Transform JSX to ERB markup.
 
     partial_prefix: e.g. "blocks/login_03/" for block sub-component paths
+    props_defaults: dict of prop name → default value string from React component
     """
     if icons is None:
         icons = set()
+    if props_defaults is None:
+        props_defaults = {}
 
     result = jsx
 
@@ -392,6 +849,16 @@ def transform_jsx_to_erb(jsx, icons=None, partial_prefix=""):
 
     # 4. Replace JSX comments {/* ... */}
     result = re.sub(r'\{/\*.*?\*/\}', lambda m: f'<%# {m.group(0)[3:-3].strip()} %>', result, flags=re.DOTALL)
+
+    # 4b. Inline prop defaults and convert .map() loops
+    if props_defaults:
+        result = _inline_props_defaults(result, props_defaults)
+
+    # 4c. Convert .map() iterations to ERB each loops
+    result = _convert_map_to_each(result)
+
+    # 4d. Convert object property access in attributes: attr={obj.prop} → attr="value" or attr="<%= obj[:prop] %>"
+    result = _convert_object_attr_access(result, props_defaults)
 
     # 5. Handle Lucide icons - self-closing: <IconName className="..." />
     def replace_icon(m):
@@ -484,6 +951,12 @@ def transform_jsx_to_erb(jsx, icons=None, partial_prefix=""):
 
     # 14. Clean up excessive blank lines
     result = re.sub(r'\n{3,}', '\n\n', result)
+
+    # 15. Prepend array local variable assignments (after all transforms to avoid ERB corruption)
+    if props_defaults:
+        array_locals = _build_array_locals(props_defaults)
+        if array_locals:
+            result = array_locals + "\n" + result
 
     return result.strip()
 
@@ -922,14 +1395,16 @@ def update_components_json(name, files, comp_type="registry:block"):
 # Main Pipeline
 # ---------------------------------------------------------------------------
 
-def process_component(name, style="new-york", url=None, output_dir=None, dry_run=False, local_files=None):
+def process_component(name, style="new-york", url=None, output_dir=None, dry_run=False, local_files=None, github_urls=None):
     """Main pipeline: fetch/load → parse → transform → generate."""
     print(f"\n{'='*60}")
     print(f"  shadcn_to_rails: Converting '{name}'")
     print(f"{'='*60}\n")
 
     # 1. Fetch or load local files
-    if local_files:
+    if github_urls:
+        data = fetch_github(github_urls)
+    elif local_files:
         data = load_local_files(local_files)
     else:
         data = fetch_registry(name, style, url)
@@ -970,6 +1445,11 @@ def process_component(name, style="new-york", url=None, output_dir=None, dry_run
         if icons:
             print(f"    Icons: {', '.join(sorted(icons))}")
 
+        # Extract props defaults
+        props_defaults = extract_props_defaults(tsx_content)
+        if props_defaults:
+            print(f"    Props: {', '.join(sorted(props_defaults.keys()))}")
+
         # Extract JSX body
         jsx_body = extract_jsx_body(tsx_content)
 
@@ -982,7 +1462,7 @@ def process_component(name, style="new-york", url=None, output_dir=None, dry_run
             partial_prefix = f"blocks/{safe_name}/"
 
         # Transform to ERB
-        erb_content = transform_jsx_to_erb(jsx_body, icons, partial_prefix=partial_prefix)
+        erb_content = transform_jsx_to_erb(jsx_body, icons, partial_prefix=partial_prefix, props_defaults=props_defaults)
 
         if comp_type == "registry:block":
             if output_dir:
@@ -1042,61 +1522,118 @@ def camel_to_snake(name):
 # CLI
 # ---------------------------------------------------------------------------
 
+def _detect_input_type(source):
+    """Detect input type from source string.
+
+    Returns: ("github", source) | ("file", source) | ("registry", source)
+    """
+    if source.startswith("https://github.com") or source.startswith("https://raw.githubusercontent.com"):
+        return "github", source
+    if Path(source).exists():
+        return "file", source
+    if source.endswith(".tsx") or source.endswith(".jsx"):
+        # Looks like a file path but doesn't exist
+        print(f"  WARNING: File not found: {source}")
+        return "file", source
+    return "registry", source
+
+
+def _derive_name_from_source(source, input_type):
+    """Derive component name from source path/URL.
+
+    Rules:
+    - GitHub URL: last path segment without extension (use parent dir if page/index)
+    - Local file: stem (filename without extension), parent dir if page/index
+    - Local directory: directory name
+    - Registry: use as-is
+    """
+    generic_names = {"page", "index", "component", "src", ".", ""}
+
+    if input_type == "github":
+        url_path = source.rstrip("/").split("/")[-1]
+        name = url_path.replace(".tsx", "").replace(".jsx", "").replace(".json", "")
+        if name.lower() in generic_names:
+            # Use parent directory name
+            parts = source.rstrip("/").split("/")
+            name = parts[-2] if len(parts) >= 2 else name
+        return name
+    elif input_type == "file":
+        p = Path(source)
+        if p.is_dir():
+            name = p.name
+        else:
+            name = p.stem
+        if name.lower() in generic_names:
+            name = p.parent.name if p.parent.name not in generic_names else name
+        return name
+    else:
+        return source
+
+
 def main():
     parser = argparse.ArgumentParser(
         description="Convert React shadcn/ui components to Rails ERB + Helper",
         epilog="Examples:\n"
                "  python bin/shadcn_to_rails login-03\n"
-               "  python bin/shadcn_to_rails button\n"
-               "  python bin/shadcn_to_rails --url https://ui.shadcn.com/r/styles/new-york/sidebar-01.json\n",
+               "  python bin/shadcn_to_rails https://github.com/user/repo/blob/main/src/block/about3.tsx\n"
+               "  python bin/shadcn_to_rails ../shadcn-studio/src/block/about3.tsx\n"
+               "  python bin/shadcn_to_rails src/page.tsx src/components/form.tsx\n",
         formatter_class=argparse.RawDescriptionHelpFormatter,
     )
-    parser.add_argument("name", nargs="?", help="Component or block name (e.g., login-03, button)")
+    parser.add_argument("sources", nargs="*", help="Source(s): registry name, GitHub URL, or local file/directory path")
     parser.add_argument("--style", default="new-york", help="shadcn style (default: new-york)")
-    parser.add_argument("--url", help="Direct URL to registry JSON")
-    parser.add_argument("--file", action="append", dest="files", metavar="PATH",
-                        help="Local TSX/JSX file or directory to convert (can be repeated)")
     parser.add_argument("--output-dir", help="Custom output directory (relative to project root)")
     parser.add_argument("--dry-run", action="store_true", help="Preview without writing files")
     parser.add_argument("--list-deps", action="store_true", help="Only list dependencies, don't convert")
 
     args = parser.parse_args()
 
-    if not args.name and not args.url and not args.files:
+    if not args.sources:
         parser.print_help()
         sys.exit(1)
 
-    name = args.name
-    if not name and args.url:
-        # Extract name from URL
-        name = args.url.rstrip("/").split("/")[-1].replace(".json", "")
-    if not name and args.files:
-        # Derive name from first file/directory path
-        first = Path(args.files[0])
-        name = (first if first.is_dir() else first.parent).name.replace("-", "_")
-        if name in (".", "src", "component", "components"):
-            name = first.stem.replace("-", "_")
+    # Classify each source
+    github_urls = []
+    local_files = []
+    registry_name = None
+
+    for source in args.sources:
+        input_type, value = _detect_input_type(source)
+        if input_type == "github":
+            github_urls.append(value)
+        elif input_type == "file":
+            local_files.append(value)
+        else:
+            registry_name = value
+
+    # Derive name from first source
+    first_source = args.sources[0]
+    first_type, _ = _detect_input_type(first_source)
+    name = _derive_name_from_source(first_source, first_type)
 
     if args.list_deps:
-        data = fetch_registry(name, args.style, args.url)
-        if data:
-            existing = load_existing_components()
-            deps = data.get("registryDependencies", [])
-            print(f"\nDependencies for '{name}':")
-            for dep in deps:
-                status = "OK" if dep in existing else "MISSING"
-                print(f"  [{status}] {dep}")
+        if registry_name:
+            data = fetch_registry(registry_name, args.style)
+            if data:
+                existing = load_existing_components()
+                deps = data.get("registryDependencies", [])
+                print(f"\nDependencies for '{name}':")
+                for dep in deps:
+                    status = "OK" if dep in existing else "MISSING"
+                    print(f"  [{status}] {dep}")
+        else:
+            print("  --list-deps only works with registry sources.")
         sys.exit(0)
 
+    # Determine which mode to use (priority: github > file > registry)
     success = process_component(
         name,
         style=args.style,
-        url=args.url,
         output_dir=args.output_dir,
         dry_run=args.dry_run,
-        local_files=args.files,
+        local_files=local_files if local_files else None,
+        github_urls=github_urls if github_urls else None,
     )
-    sys.exit(0 if success else 1)
 
 
 if __name__ == "__main__":

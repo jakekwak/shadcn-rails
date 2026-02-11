@@ -471,5 +471,12 @@
       "app/views/blocks/login_05/_login_05.html.erb",
       "app/views/blocks/login_05/_login_form.html.erb"
     ]
+  },
+  "about3": {
+    "name": "about3",
+    "type": "components:block",
+    "files": [
+      "app/views/blocks/about3/_about3.html.erb"
+    ]
   }
 }
