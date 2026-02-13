@@ -1,0 +1,2541 @@
+#!/usr/bin/env python3
+"""
+shadcn_to_dioxus: Convert React shadcn/ui components, blocks, and templates to Dioxus RSX (Rust).
+
+Usage:
+    python bin/shadcn_to_dioxus <source> [options]
+
+입력 자동 판별:
+    - GitHub URL  → GitHub에서 TSX 가져오기
+    - 로컬 파일/디렉토리 → 로컬 TSX 변환
+    - 그 외       → shadcn 레지스트리 이름으로 간주
+
+Examples:
+    # shadcn 레지스트리
+    python bin/shadcn_to_dioxus accordion
+    python bin/shadcn_to_dioxus login-03
+
+    # GitHub URL
+    python bin/shadcn_to_dioxus https://github.com/shadcnblocks/shadcn-ui-blocks/blob/master/src/block/about3.tsx
+
+    # 로컬 파일
+    python bin/shadcn_to_dioxus ../shadcn-studio/src/block/about3.tsx
+
+    # 옵션
+    python bin/shadcn_to_dioxus login-03 --dry-run
+    python bin/shadcn_to_dioxus accordion --list-deps
+"""
+
+import argparse
+import json
+import os
+import re
+import sys
+import textwrap
+import urllib.request
+from pathlib import Path
+
+# ---------------------------------------------------------------------------
+# Constants
+# ---------------------------------------------------------------------------
+
+REGISTRY_BASE = "https://ui.shadcn.com/r/styles/new-york"
+PROJECT_ROOT = Path(__file__).resolve().parent.parent
+OUTPUT_BASE = PROJECT_ROOT / "shadcn_dioxus" / "src" / "components"
+
+# Known Dioxus components (these map to actual Dioxus component structs)
+COMPONENT_MAP = {
+    "Button": {"component": "Button", "props_map": {
+        "variant": "variant",
+        "size": "size",
+    }},
+    "Accordion": {"component": "Accordion", "props_map": {
+        "type": "accordion_type",
+    }},
+    "AccordionItem": {"component": "AccordionItem", "auto_index": True},
+    "AccordionTrigger": {"component": "AccordionTrigger"},
+    "AccordionContent": {"component": "AccordionContent"},
+    "Checkbox": {"component": "Checkbox"},
+    "Dialog": {"component": "Dialog"},
+    "DialogTrigger": {"component": "DialogTrigger"},
+    "DialogContent": {"component": "DialogContent"},
+    "Tabs": {"component": "Tabs"},
+    "TabsList": {"component": "TabsList"},
+    "TabsTrigger": {"component": "TabsTrigger"},
+    "TabsContent": {"component": "TabsContent"},
+    "Separator": {"component": "Separator"},
+    "Input": {"component": "Input", "props_map": {
+        "type": "r#type",
+        "placeholder": "placeholder",
+    }},
+    "Label": {"component": "Label", "props_map": {
+        "htmlFor": "r#for",
+    }},
+    "Switch": {"component": "Switch"},
+    "Select": {"component": "Select"},
+    "SelectTrigger": {"component": "SelectTrigger"},
+    "SelectContent": {"component": "SelectContent"},
+    "SelectItem": {"component": "SelectItem"},
+    "SelectValue": {"component": "SelectValue"},
+    "Textarea": {"component": "Textarea"},
+    "Toggle": {"component": "Toggle"},
+    "Slider": {"component": "Slider"},
+    "Progress": {"component": "Progress"},
+    "Avatar": {"component": "Avatar"},
+    "AvatarImage": {"component": "AvatarImage"},
+    "AvatarFallback": {"component": "AvatarFallback"},
+    "Badge": {"component": "Badge"},
+    "Skeleton": {"component": "Skeleton"},
+    "ScrollArea": {"component": "ScrollArea"},
+    # Tooltip → converted to CSS-only tooltip in post-processing (see _convert_tooltips_to_css)
+    "Popover": {"component": "Popover"},
+    "PopoverTrigger": {"component": "PopoverTrigger"},
+    "PopoverContent": {"component": "PopoverContent"},
+    "Alert": {"component": "Alert"},
+    "AlertTitle": {"component": "AlertTitle"},
+    "AlertDescription": {"component": "AlertDescription"},
+    "DropdownMenu": {"component": "DropdownMenu"},
+    "DropdownMenuTrigger": {"component": "DropdownMenuTrigger"},
+    "DropdownMenuContent": {"component": "DropdownMenuContent"},
+    "DropdownMenuItem": {"component": "DropdownMenuItem"},
+    "DropdownMenuLabel": {"component": "DropdownMenuLabel"},
+    "DropdownMenuSeparator": {"component": "DropdownMenuSeparator"},
+    "Sheet": {"component": "Sheet"},
+    "SheetTrigger": {"component": "SheetTrigger"},
+    "SheetContent": {"component": "SheetContent"},
+    "Collapsible": {"component": "Collapsible"},
+    "Table": {"component": "Table"},
+    "HoverCard": {"component": "HoverCard"},
+}
+
+# Sub-components mapped to plain HTML tags with Tailwind classes (no Dioxus primitive)
+SUB_COMPONENT_MAP = {
+    "CardHeader": {"tag": "div", "class": "flex flex-col space-y-1.5 p-6"},
+    "CardTitle": {"tag": "h3", "class": "font-semibold leading-none tracking-tight"},
+    "CardDescription": {"tag": "p", "class": "text-sm text-muted-foreground"},
+    "CardContent": {"tag": "div", "class": "p-6 pt-0"},
+    "CardFooter": {"tag": "div", "class": "flex items-center p-6 pt-0"},
+    "Card": {"tag": "div", "class": "rounded-xl border bg-card text-card-foreground shadow"},
+    "DialogHeader": {"tag": "div", "class": "flex flex-col space-y-1.5 text-center sm:text-left"},
+    "DialogFooter": {"tag": "div", "class": "flex flex-col-reverse sm:flex-row sm:justify-end sm:space-x-2"},
+    "DialogTitle": {"tag": "h2", "class": "text-lg font-semibold leading-none tracking-tight"},
+    "DialogDescription": {"tag": "p", "class": "text-sm text-muted-foreground"},
+    "SheetHeader": {"tag": "div", "class": "flex flex-col space-y-2 text-center sm:text-left"},
+    "SheetFooter": {"tag": "div", "class": "flex flex-col-reverse sm:flex-row sm:justify-end sm:space-x-2"},
+    "SheetTitle": {"tag": "h2", "class": "text-lg font-semibold text-foreground"},
+    "SheetDescription": {"tag": "p", "class": "text-sm text-muted-foreground"},
+    "TableHeader": {"tag": "thead", "class": "[&_tr]:border-b"},
+    "TableBody": {"tag": "tbody", "class": "[&_tr:last-child]:border-0"},
+    "TableFooter": {"tag": "tfoot", "class": "border-t bg-muted/50 font-medium [&>tr]:last:border-b-0"},
+    "TableRow": {"tag": "tr", "class": "border-b transition-colors hover:bg-muted/50 data-[state=selected]:bg-muted"},
+    "TableHead": {"tag": "th", "class": "h-12 px-4 text-left align-middle font-medium text-muted-foreground"},
+    "TableCell": {"tag": "td", "class": "p-4 align-middle"},
+    "TableCaption": {"tag": "caption", "class": "mt-4 text-sm text-muted-foreground"},
+    "NavigationMenu": {"tag": "nav", "class": ""},
+    "NavigationMenuList": {"tag": "ul", "class": ""},
+    "NavigationMenuItem": {"tag": "li", "class": ""},
+    "NavigationMenuLink": {"tag": "a", "class": ""},
+    "NavigationMenuTrigger": {"tag": "button", "class": ""},
+    "NavigationMenuContent": {"tag": "div", "class": ""},
+    "FormField": {"tag": "div", "class": "space-y-2"},
+    "FormItem": {"tag": "div", "class": "space-y-2"},
+    "FormLabel": {"tag": "label", "class": "text-sm font-medium leading-none"},
+    "FormControl": {"tag": "div", "class": "", "unwrap": True},
+    "FormDescription": {"tag": "p", "class": "text-sm text-muted-foreground"},
+    "FormMessage": {"tag": "p", "class": "text-sm font-medium text-destructive"},
+    "BreadcrumbList": {"tag": "ol", "class": "flex flex-wrap items-center gap-1.5 break-words text-sm text-muted-foreground sm:gap-2.5"},
+    "BreadcrumbItem": {"tag": "li", "class": "inline-flex items-center gap-1.5"},
+    "BreadcrumbLink": {"tag": "a", "class": "transition-colors hover:text-foreground"},
+    "BreadcrumbPage": {"tag": "span", "class": "font-normal text-foreground"},
+    "BreadcrumbSeparator": {"tag": "li", "class": "[&>svg]:size-3.5"},
+    "BreadcrumbEllipsis": {"tag": "span", "class": "flex h-9 w-9 items-center justify-center"},
+    "ScrollBar": {"tag": "div", "class": ""},
+    "SelectGroup": {"tag": "div", "class": ""},
+    "SelectLabel": {"tag": "label", "class": "py-1.5 pl-8 pr-2 text-sm font-semibold"},
+    "SelectSeparator": {"tag": "hr", "class": "-mx-1 my-1 h-px bg-muted"},
+    "TooltipProvider": {"tag": "div", "class": "", "unwrap": True},
+    "DropdownMenuGroup": {"tag": "div", "class": ""},
+    "DropdownMenuSub": {"tag": "div", "class": ""},
+    "DropdownMenuSubTrigger": {"tag": "div", "class": "flex cursor-default select-none items-center rounded-sm px-2 py-1.5 text-sm outline-none"},
+    "DropdownMenuSubContent": {"tag": "div", "class": "z-50 min-w-[8rem] overflow-hidden rounded-md border bg-popover p-1 text-popover-foreground shadow-md"},
+    "DropdownMenuCheckboxItem": {"tag": "div", "class": "relative flex cursor-default select-none items-center rounded-sm py-1.5 pl-8 pr-2 text-sm outline-none"},
+    "DropdownMenuRadioGroup": {"tag": "div", "class": ""},
+    "DropdownMenuRadioItem": {"tag": "div", "class": "relative flex cursor-default select-none items-center rounded-sm py-1.5 pl-8 pr-2 text-sm outline-none"},
+    "DropdownMenuShortcut": {"tag": "span", "class": "ml-auto text-xs tracking-widest opacity-60"},
+    "CarouselContent": {"tag": "div", "class": "flex"},
+    "CarouselItem": {"tag": "div", "class": "min-w-0 shrink-0 grow-0 basis-full"},
+    "CarouselPrevious": {"tag": "button", "class": ""},
+    "CarouselNext": {"tag": "button", "class": ""},
+}
+
+# JSX attribute name → RSX attribute name
+ATTR_MAP = {
+    "className": "class",
+    "htmlFor": "r#for",
+    "tabIndex": "tabindex",
+    "autoFocus": "autofocus",
+    "autoComplete": "autocomplete",
+    "readOnly": "readonly",
+    "maxLength": "maxlength",
+    "minLength": "minlength",
+    "noValidate": "novalidate",
+    "crossOrigin": "crossorigin",
+    "formAction": "formaction",
+    "formMethod": "formmethod",
+    "formNoValidate": "formnovalidate",
+    "formTarget": "formtarget",
+    "inputMode": "inputmode",
+    "spellCheck": "spellcheck",
+    "srcSet": "srcset",
+    "useMap": "usemap",
+    "accessKey": "accesskey",
+    "contentEditable": "contenteditable",
+    "contextMenu": "contextmenu",
+    "encType": "enctype",
+    "acceptCharset": "accept-charset",
+    "httpEquiv": "http-equiv",
+    "cellPadding": "cellpadding",
+    "cellSpacing": "cellspacing",
+    "colSpan": "colspan",
+    "rowSpan": "rowspan",
+    "frameBorder": "frameborder",
+}
+
+# Common Lucide icons → inline SVG RSX
+LUCIDE_ICONS = {
+    "Check": 'svg { class: "size-4", xmlns: "http://www.w3.org/2000/svg", view_box: "0 0 24 24", fill: "none", stroke: "currentColor", stroke_width: "2", stroke_linecap: "round", stroke_linejoin: "round", path { d: "M20 6 9 17l-5-5" } }',
+    "ChevronDown": 'svg { class: "size-4", xmlns: "http://www.w3.org/2000/svg", view_box: "0 0 24 24", fill: "none", stroke: "currentColor", stroke_width: "2", stroke_linecap: "round", stroke_linejoin: "round", path { d: "m6 9 6 6 6-6" } }',
+    "ChevronRight": 'svg { class: "size-4", xmlns: "http://www.w3.org/2000/svg", view_box: "0 0 24 24", fill: "none", stroke: "currentColor", stroke_width: "2", stroke_linecap: "round", stroke_linejoin: "round", path { d: "m9 18 6-6-6-6" } }',
+    "ChevronLeft": 'svg { class: "size-4", xmlns: "http://www.w3.org/2000/svg", view_box: "0 0 24 24", fill: "none", stroke: "currentColor", stroke_width: "2", stroke_linecap: "round", stroke_linejoin: "round", path { d: "m15 18-6-6 6-6" } }',
+    "ChevronUp": 'svg { class: "size-4", xmlns: "http://www.w3.org/2000/svg", view_box: "0 0 24 24", fill: "none", stroke: "currentColor", stroke_width: "2", stroke_linecap: "round", stroke_linejoin: "round", path { d: "m18 15-6-6-6 6" } }',
+    "X": 'svg { class: "size-4", xmlns: "http://www.w3.org/2000/svg", view_box: "0 0 24 24", fill: "none", stroke: "currentColor", stroke_width: "2", stroke_linecap: "round", stroke_linejoin: "round", path { d: "M18 6 6 18" } path { d: "m6 6 12 12" } }',
+    "Search": 'svg { class: "size-4", xmlns: "http://www.w3.org/2000/svg", view_box: "0 0 24 24", fill: "none", stroke: "currentColor", stroke_width: "2", stroke_linecap: "round", stroke_linejoin: "round", circle { cx: "11", cy: "11", r: "8" } path { d: "m21 21-4.3-4.3" } }',
+    "Plus": 'svg { class: "size-4", xmlns: "http://www.w3.org/2000/svg", view_box: "0 0 24 24", fill: "none", stroke: "currentColor", stroke_width: "2", stroke_linecap: "round", stroke_linejoin: "round", path { d: "M5 12h14" } path { d: "M12 5v14" } }',
+    "Minus": 'svg { class: "size-4", xmlns: "http://www.w3.org/2000/svg", view_box: "0 0 24 24", fill: "none", stroke: "currentColor", stroke_width: "2", stroke_linecap: "round", stroke_linejoin: "round", path { d: "M5 12h14" } }',
+    "Eye": 'svg { class: "size-4", xmlns: "http://www.w3.org/2000/svg", view_box: "0 0 24 24", fill: "none", stroke: "currentColor", stroke_width: "2", stroke_linecap: "round", stroke_linejoin: "round", path { d: "M2.062 12.348a1 1 0 0 1 0-.696 10.75 10.75 0 0 1 19.876 0 1 1 0 0 1 0 .696 10.75 10.75 0 0 1-19.876 0" } circle { cx: "12", cy: "12", r: "3" } }',
+    "EyeOff": 'svg { class: "size-4", xmlns: "http://www.w3.org/2000/svg", view_box: "0 0 24 24", fill: "none", stroke: "currentColor", stroke_width: "2", stroke_linecap: "round", stroke_linejoin: "round", path { d: "M10.733 5.076a10.744 10.744 0 0 1 11.205 6.575 1 1 0 0 1 0 .696 10.747 10.747 0 0 1-1.444 2.49" } path { d: "M14.084 14.158a3 3 0 0 1-4.242-4.242" } path { d: "M17.479 17.499a10.75 10.75 0 0 1-15.417-5.151 1 1 0 0 1 0-.696 10.75 10.75 0 0 1 4.446-5.143" } path { d: "m2 2 20 20" } }',
+    "Moon": 'svg { class: "size-4", xmlns: "http://www.w3.org/2000/svg", view_box: "0 0 24 24", fill: "none", stroke: "currentColor", stroke_width: "2", stroke_linecap: "round", stroke_linejoin: "round", path { d: "M12 3a6 6 0 0 0 9 9 9 9 0 1 1-9-9Z" } }',
+    "Sun": 'svg { class: "size-4", xmlns: "http://www.w3.org/2000/svg", view_box: "0 0 24 24", fill: "none", stroke: "currentColor", stroke_width: "2", stroke_linecap: "round", stroke_linejoin: "round", circle { cx: "12", cy: "12", r: "4" } path { d: "M12 2v2" } path { d: "M12 20v2" } path { d: "m4.93 4.93 1.41 1.41" } path { d: "m17.66 17.66 1.41 1.41" } path { d: "M2 12h2" } path { d: "M20 12h2" } path { d: "m6.34 17.66-1.41 1.41" } path { d: "m19.07 4.93-1.41 1.41" } }',
+    "Menu": 'svg { class: "size-4", xmlns: "http://www.w3.org/2000/svg", view_box: "0 0 24 24", fill: "none", stroke: "currentColor", stroke_width: "2", stroke_linecap: "round", stroke_linejoin: "round", line { x1: "4", x2: "20", y1: "12", y2: "12" } line { x1: "4", x2: "20", y1: "6", y2: "6" } line { x1: "4", x2: "20", y1: "18", y2: "18" } }',
+    "ArrowRight": 'svg { class: "size-4", xmlns: "http://www.w3.org/2000/svg", view_box: "0 0 24 24", fill: "none", stroke: "currentColor", stroke_width: "2", stroke_linecap: "round", stroke_linejoin: "round", path { d: "M5 12h14" } path { d: "m12 5 7 7-7 7" } }',
+    "ArrowLeft": 'svg { class: "size-4", xmlns: "http://www.w3.org/2000/svg", view_box: "0 0 24 24", fill: "none", stroke: "currentColor", stroke_width: "2", stroke_linecap: "round", stroke_linejoin: "round", path { d: "m12 19-7-7 7-7" } path { d: "M19 12H5" } }',
+    "Loader2": 'svg { class: "size-4 animate-spin", xmlns: "http://www.w3.org/2000/svg", view_box: "0 0 24 24", fill: "none", stroke: "currentColor", stroke_width: "2", stroke_linecap: "round", stroke_linejoin: "round", path { d: "M21 12a9 9 0 1 1-6.219-8.56" } }',
+    "Mail": 'svg { class: "size-4", xmlns: "http://www.w3.org/2000/svg", view_box: "0 0 24 24", fill: "none", stroke: "currentColor", stroke_width: "2", stroke_linecap: "round", stroke_linejoin: "round", rect { width: "20", height: "16", x: "2", y: "4", rx: "2" } path { d: "m22 7-8.97 5.7a1.94 1.94 0 0 1-2.06 0L2 7" } }',
+    "User": 'svg { class: "size-4", xmlns: "http://www.w3.org/2000/svg", view_box: "0 0 24 24", fill: "none", stroke: "currentColor", stroke_width: "2", stroke_linecap: "round", stroke_linejoin: "round", path { d: "M19 21v-2a4 4 0 0 0-4-4H9a4 4 0 0 0-4 4v2" } circle { cx: "12", cy: "7", r: "4" } }',
+    "Settings": 'svg { class: "size-4", xmlns: "http://www.w3.org/2000/svg", view_box: "0 0 24 24", fill: "none", stroke: "currentColor", stroke_width: "2", stroke_linecap: "round", stroke_linejoin: "round", path { d: "M12.22 2h-.44a2 2 0 0 0-2 2v.18a2 2 0 0 1-1 1.73l-.43.25a2 2 0 0 1-2 0l-.15-.08a2 2 0 0 0-2.73.73l-.22.38a2 2 0 0 0 .73 2.73l.15.1a2 2 0 0 1 1 1.72v.51a2 2 0 0 1-1 1.74l-.15.09a2 2 0 0 0-.73 2.73l.22.38a2 2 0 0 0 2.73.73l.15-.08a2 2 0 0 1 2 0l.43.25a2 2 0 0 1 1 1.73V20a2 2 0 0 0 2 2h.44a2 2 0 0 0 2-2v-.18a2 2 0 0 1 1-1.73l.43-.25a2 2 0 0 1 2 0l.15.08a2 2 0 0 0 2.73-.73l.22-.39a2 2 0 0 0-.73-2.73l-.15-.08a2 2 0 0 1-1-1.74v-.5a2 2 0 0 1 1-1.74l.15-.09a2 2 0 0 0 .73-2.73l-.22-.38a2 2 0 0 0-2.73-.73l-.15.08a2 2 0 0 1-2 0l-.43-.25a2 2 0 0 1-1-1.73V4a2 2 0 0 0-2-2z" } circle { cx: "12", cy: "12", r: "3" } }',
+    "Home": 'svg { class: "size-4", xmlns: "http://www.w3.org/2000/svg", view_box: "0 0 24 24", fill: "none", stroke: "currentColor", stroke_width: "2", stroke_linecap: "round", stroke_linejoin: "round", path { d: "m3 9 9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z" } }',
+    "Star": 'svg { class: "size-4", xmlns: "http://www.w3.org/2000/svg", view_box: "0 0 24 24", fill: "none", stroke: "currentColor", stroke_width: "2", stroke_linecap: "round", stroke_linejoin: "round", polygon { points: "12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2" } }',
+    "Trash": 'svg { class: "size-4", xmlns: "http://www.w3.org/2000/svg", view_box: "0 0 24 24", fill: "none", stroke: "currentColor", stroke_width: "2", stroke_linecap: "round", stroke_linejoin: "round", path { d: "M3 6h18" } path { d: "M19 6v14c0 1-1 2-2 2H7c-1 0-2-1-2-2V6" } path { d: "M8 6V4c0-1 1-2 2-2h4c1 0 2 1 2 2v2" } }',
+    "GalleryVerticalEnd": 'svg { class: "size-4", xmlns: "http://www.w3.org/2000/svg", view_box: "0 0 24 24", fill: "none", stroke: "currentColor", stroke_width: "2", stroke_linecap: "round", stroke_linejoin: "round", path { d: "M7 2h10" } path { d: "M5 6h14" } rect { width: "18", height: "12", x: "3", y: "10", rx: "2" } }',
+    "RefreshCcw": 'svg { class: "size-4", xmlns: "http://www.w3.org/2000/svg", view_box: "0 0 24 24", fill: "none", stroke: "currentColor", stroke_width: "2", stroke_linecap: "round", stroke_linejoin: "round", path { d: "M21 12a9 9 0 0 0-9-9 9.75 9.75 0 0 0-6.74 2.74L3 8" } path { d: "M3 3v5h5" } path { d: "M3 12a9 9 0 0 0 9 9 9.75 9.75 0 0 0 6.74-2.74L21 16" } path { d: "M16 16h5v5" } }',
+    "ListChecks": 'svg { class: "size-4", xmlns: "http://www.w3.org/2000/svg", view_box: "0 0 24 24", fill: "none", stroke: "currentColor", stroke_width: "2", stroke_linecap: "round", stroke_linejoin: "round", path { d: "m3 17 2 2 4-4" } path { d: "m3 7 2 2 4-4" } path { d: "M13 6h8" } path { d: "M13 12h8" } path { d: "M13 18h8" } }',
+    "AlignLeft": 'svg { class: "size-4", xmlns: "http://www.w3.org/2000/svg", view_box: "0 0 24 24", fill: "none", stroke: "currentColor", stroke_width: "2", stroke_linecap: "round", stroke_linejoin: "round", path { d: "M15 12H3" } path { d: "M17 18H3" } path { d: "M21 6H3" } }',
+    "Lightbulb": 'svg { class: "size-4", xmlns: "http://www.w3.org/2000/svg", view_box: "0 0 24 24", fill: "none", stroke: "currentColor", stroke_width: "2", stroke_linecap: "round", stroke_linejoin: "round", path { d: "M15 14c.2-1 .7-1.7 1.5-2.5 1-.9 1.5-2.2 1.5-3.5A6 6 0 0 0 6 8c0 1 .2 2.2 1.5 3.5.7.7 1.3 1.5 1.5 2.5" } path { d: "M9 18h6" } path { d: "M10 22h4" } }',
+    "Heart": 'svg { class: "size-4", xmlns: "http://www.w3.org/2000/svg", view_box: "0 0 24 24", fill: "none", stroke: "currentColor", stroke_width: "2", stroke_linecap: "round", stroke_linejoin: "round", path { d: "M19 14c1.49-1.46 3-3.21 3-5.5A5.5 5.5 0 0 0 16.5 3c-1.76 0-3 .5-4.5 2-1.5-1.5-2.74-2-4.5-2A5.5 5.5 0 0 0 2 8.5c0 2.3 1.5 4.05 3 5.5l7 7Z" } }',
+    "Monitor": 'svg { class: "size-4", xmlns: "http://www.w3.org/2000/svg", view_box: "0 0 24 24", fill: "none", stroke: "currentColor", stroke_width: "2", stroke_linecap: "round", stroke_linejoin: "round", rect { width: "20", height: "14", x: "2", y: "3", rx: "2" } line { x1: "8", x2: "16", y1: "21", y2: "21" } line { x1: "12", x2: "12", y1: "17", y2: "21" } }',
+    "Smartphone": 'svg { class: "size-4", xmlns: "http://www.w3.org/2000/svg", view_box: "0 0 24 24", fill: "none", stroke: "currentColor", stroke_width: "2", stroke_linecap: "round", stroke_linejoin: "round", rect { width: "14", height: "20", x: "5", y: "2", rx: "2", ry: "2" } path { d: "M12 18h.01" } }',
+    "Tablet": 'svg { class: "size-4", xmlns: "http://www.w3.org/2000/svg", view_box: "0 0 24 24", fill: "none", stroke: "currentColor", stroke_width: "2", stroke_linecap: "round", stroke_linejoin: "round", rect { width: "16", height: "20", x: "4", y: "2", rx: "2", ry: "2" } line { x1: "12", x2: "12.01", y1: "18", y2: "18" } }',
+    "Download": 'svg { class: "size-4", xmlns: "http://www.w3.org/2000/svg", view_box: "0 0 24 24", fill: "none", stroke: "currentColor", stroke_width: "2", stroke_linecap: "round", stroke_linejoin: "round", path { d: "M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" } polyline { points: "7 10 12 15 17 10" } line { x1: "12", x2: "12", y1: "15", y2: "3" } }',
+    "ExternalLink": 'svg { class: "size-4", xmlns: "http://www.w3.org/2000/svg", view_box: "0 0 24 24", fill: "none", stroke: "currentColor", stroke_width: "2", stroke_linecap: "round", stroke_linejoin: "round", path { d: "M15 3h6v6" } path { d: "M10 14 21 3" } path { d: "M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6" } }',
+    "Github": 'svg { class: "size-4", xmlns: "http://www.w3.org/2000/svg", view_box: "0 0 24 24", fill: "none", stroke: "currentColor", stroke_width: "2", stroke_linecap: "round", stroke_linejoin: "round", path { d: "M15 22v-4a4.8 4.8 0 0 0-1-3.5c3 0 6-2 6-5.5.08-1.25-.27-2.48-1-3.5.28-1.15.28-2.35 0-3.5 0 0-1 0-3 1.5-2.64-.5-5.36-.5-8 0C6 2 5 2 5 2c-.3 1.15-.3 2.35 0 3.5A5.403 5.403 0 0 0 4 9c0 3.5 3 5.5 6 5.5-.39.49-.68 1.05-.85 1.65-.17.6-.22 1.23-.15 1.85v4" } path { d: "M9 18c-4.51 2-5-2-7-2" } }',
+    "Globe": 'svg { class: "size-4", xmlns: "http://www.w3.org/2000/svg", view_box: "0 0 24 24", fill: "none", stroke: "currentColor", stroke_width: "2", stroke_linecap: "round", stroke_linejoin: "round", circle { cx: "12", cy: "12", r: "10" } path { d: "M12 2a14.5 14.5 0 0 0 0 20 14.5 14.5 0 0 0 0-20" } path { d: "M2 12h20" } }',
+    "Wifi": 'svg { class: "size-4", xmlns: "http://www.w3.org/2000/svg", view_box: "0 0 24 24", fill: "none", stroke: "currentColor", stroke_width: "2", stroke_linecap: "round", stroke_linejoin: "round", path { d: "M12 20h.01" } path { d: "M2 8.82a15 15 0 0 1 20 0" } path { d: "M5 12.859a10 10 0 0 1 14 0" } path { d: "M8.5 16.429a5 5 0 0 1 7 0" } }',
+    "Zap": 'svg { class: "size-4", xmlns: "http://www.w3.org/2000/svg", view_box: "0 0 24 24", fill: "none", stroke: "currentColor", stroke_width: "2", stroke_linecap: "round", stroke_linejoin: "round", path { d: "M4 14a1 1 0 0 1-.78-1.63l9.9-10.2a.5.5 0 0 1 .86.46l-1.92 6.02A1 1 0 0 0 13 10h7a1 1 0 0 1 .78 1.63l-9.9 10.2a.5.5 0 0 1-.86-.46l1.92-6.02A1 1 0 0 0 11 14z" } }',
+    "Shield": 'svg { class: "size-4", xmlns: "http://www.w3.org/2000/svg", view_box: "0 0 24 24", fill: "none", stroke: "currentColor", stroke_width: "2", stroke_linecap: "round", stroke_linejoin: "round", path { d: "M20 13c0 5-3.5 7.5-7.66 8.95a1 1 0 0 1-.67-.01C7.5 20.5 4 18 4 13V6a1 1 0 0 1 1-1c2 0 4.5-1.2 6.24-2.72a1.17 1.17 0 0 1 1.52 0C14.51 3.81 17 5 19 5a1 1 0 0 1 1 1z" } }',
+    "Sparkles": 'svg { class: "size-4", xmlns: "http://www.w3.org/2000/svg", view_box: "0 0 24 24", fill: "none", stroke: "currentColor", stroke_width: "2", stroke_linecap: "round", stroke_linejoin: "round", path { d: "M9.937 15.5A2 2 0 0 0 8.5 14.063l-6.135-1.582a.5.5 0 0 1 0-.962L8.5 9.936A2 2 0 0 0 9.937 8.5l1.582-6.135a.5.5 0 0 1 .963 0L14.063 8.5A2 2 0 0 0 15.5 9.937l6.135 1.581a.5.5 0 0 1 0 .964L15.5 14.063a2 2 0 0 0-1.437 1.437l-1.582 6.135a.5.5 0 0 1-.963 0z" } path { d: "M20 3v4" } path { d: "M22 5h-4" } path { d: "M4 17v2" } path { d: "M5 18H3" } }',
+    "Rocket": 'svg { class: "size-4", xmlns: "http://www.w3.org/2000/svg", view_box: "0 0 24 24", fill: "none", stroke: "currentColor", stroke_width: "2", stroke_linecap: "round", stroke_linejoin: "round", path { d: "M4.5 16.5c-1.5 1.26-2 5-2 5s3.74-.5 5-2c.71-.84.7-2.13-.09-2.91a2.18 2.18 0 0 0-2.91-.09z" } path { d: "m12 15-3-3a22 22 0 0 1 2-3.95A12.88 12.88 0 0 1 22 2c0 2.72-.78 7.5-6 11a22.35 22.35 0 0 1-4 2z" } path { d: "M9 12H4s.55-3.03 2-4c1.62-1.08 5 0 5 0" } path { d: "M12 15v5s3.03-.55 4-2c1.08-1.62 0-5 0-5" } }',
+    "Lock": 'svg { class: "size-4", xmlns: "http://www.w3.org/2000/svg", view_box: "0 0 24 24", fill: "none", stroke: "currentColor", stroke_width: "2", stroke_linecap: "round", stroke_linejoin: "round", rect { width: "18", height: "11", x: "3", y: "11", rx: "2", ry: "2" } path { d: "M7 11V7a5 5 0 0 1 10 0v4" } }',
+    "Info": 'svg { class: "size-4", xmlns: "http://www.w3.org/2000/svg", view_box: "0 0 24 24", fill: "none", stroke: "currentColor", stroke_width: "2", stroke_linecap: "round", stroke_linejoin: "round", circle { cx: "12", cy: "12", r: "10" } path { d: "M12 16v-4" } path { d: "M12 8h.01" } }',
+    "Book": 'svg { class: "size-4", xmlns: "http://www.w3.org/2000/svg", view_box: "0 0 24 24", fill: "none", stroke: "currentColor", stroke_width: "2", stroke_linecap: "round", stroke_linejoin: "round", path { d: "M4 19.5v-15A2.5 2.5 0 0 1 6.5 2H19a1 1 0 0 1 1 1v18a1 1 0 0 1-1 1H6.5a1 1 0 0 1 0-5H20" } }',
+    "ArrowDownRight": 'svg { class: "size-4", xmlns: "http://www.w3.org/2000/svg", view_box: "0 0 24 24", fill: "none", stroke: "currentColor", stroke_width: "2", stroke_linecap: "round", stroke_linejoin: "round", path { d: "m7 7 10 10" } path { d: "M17 7v10H7" } }',
+    "Share2": 'svg { class: "size-4", xmlns: "http://www.w3.org/2000/svg", view_box: "0 0 24 24", fill: "none", stroke: "currentColor", stroke_width: "2", stroke_linecap: "round", stroke_linejoin: "round", circle { cx: "18", cy: "5", r: "3" } circle { cx: "6", cy: "12", r: "3" } circle { cx: "18", cy: "19", r: "3" } line { x1: "8.59", x2: "15.42", y1: "13.51", y2: "17.49" } line { x1: "15.41", x2: "8.59", y1: "6.51", y2: "10.49" } }',
+    "Users": 'svg { class: "size-4", xmlns: "http://www.w3.org/2000/svg", view_box: "0 0 24 24", fill: "none", stroke: "currentColor", stroke_width: "2", stroke_linecap: "round", stroke_linejoin: "round", path { d: "M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2" } circle { cx: "9", cy: "7", r: "4" } path { d: "M22 21v-2a4 4 0 0 0-3-3.87" } path { d: "M16 3.13a4 4 0 0 1 0 7.75" } }',
+    "Calendar": 'svg { class: "size-4", xmlns: "http://www.w3.org/2000/svg", view_box: "0 0 24 24", fill: "none", stroke: "currentColor", stroke_width: "2", stroke_linecap: "round", stroke_linejoin: "round", path { d: "M8 2v4" } path { d: "M16 2v4" } rect { width: "18", height: "18", x: "3", y: "4", rx: "2" } path { d: "M3 10h18" } }',
+    "Phone": 'svg { class: "size-4", xmlns: "http://www.w3.org/2000/svg", view_box: "0 0 24 24", fill: "none", stroke: "currentColor", stroke_width: "2", stroke_linecap: "round", stroke_linejoin: "round", path { d: "M22 16.92v3a2 2 0 0 1-2.18 2 19.79 19.79 0 0 1-8.63-3.07 19.5 19.5 0 0 1-6-6 19.79 19.79 0 0 1-3.07-8.67A2 2 0 0 1 4.11 2h3a2 2 0 0 1 2 1.72 12.84 12.84 0 0 0 .7 2.81 2 2 0 0 1-.45 2.11L8.09 9.91a16 16 0 0 0 6 6l1.27-1.27a2 2 0 0 1 2.11-.45 12.84 12.84 0 0 0 2.81.7A2 2 0 0 1 22 16.92z" } }',
+    "MapPin": 'svg { class: "size-4", xmlns: "http://www.w3.org/2000/svg", view_box: "0 0 24 24", fill: "none", stroke: "currentColor", stroke_width: "2", stroke_linecap: "round", stroke_linejoin: "round", path { d: "M20 10c0 6-8 12-8 12s-8-6-8-12a8 8 0 0 1 16 0Z" } circle { cx: "12", cy: "10", r: "3" } }',
+    "Clock": 'svg { class: "size-4", xmlns: "http://www.w3.org/2000/svg", view_box: "0 0 24 24", fill: "none", stroke: "currentColor", stroke_width: "2", stroke_linecap: "round", stroke_linejoin: "round", circle { cx: "12", cy: "12", r: "10" } }',
+    "Code": 'svg { class: "size-4", xmlns: "http://www.w3.org/2000/svg", view_box: "0 0 24 24", fill: "none", stroke: "currentColor", stroke_width: "2", stroke_linecap: "round", stroke_linejoin: "round", polyline { points: "16 18 22 12 16 6" } polyline { points: "8 6 2 12 8 18" } }',
+    "Terminal": 'svg { class: "size-4", xmlns: "http://www.w3.org/2000/svg", view_box: "0 0 24 24", fill: "none", stroke: "currentColor", stroke_width: "2", stroke_linecap: "round", stroke_linejoin: "round", polyline { points: "4 17 10 11 4 5" } line { x1: "12", x2: "20", y1: "19", y2: "19" } }',
+    "Layers": 'svg { class: "size-4", xmlns: "http://www.w3.org/2000/svg", view_box: "0 0 24 24", fill: "none", stroke: "currentColor", stroke_width: "2", stroke_linecap: "round", stroke_linejoin: "round", path { d: "m12.83 2.18a2 2 0 0 0-1.66 0L2.6 6.08a1 1 0 0 0 0 1.83l8.58 3.91a2 2 0 0 0 1.66 0l8.58-3.9a1 1 0 0 0 0-1.83Z" } path { d: "m22.54 12.43-1.96-.89-8.58 3.91a2 2 0 0 1-1.66 0l-8.58-3.91-1.96.89a1 1 0 0 0 0 1.83l8.58 3.9a2 2 0 0 0 1.66 0l8.58-3.9a1 1 0 0 0 0-1.83Z" } }',
+    "MessageCircle": 'svg { class: "size-4", xmlns: "http://www.w3.org/2000/svg", view_box: "0 0 24 24", fill: "none", stroke: "currentColor", stroke_width: "2", stroke_linecap: "round", stroke_linejoin: "round", path { d: "M7.9 20A9 9 0 1 0 4 16.1L2 22Z" } }',
+    "Play": 'svg { class: "size-4", xmlns: "http://www.w3.org/2000/svg", view_box: "0 0 24 24", fill: "none", stroke: "currentColor", stroke_width: "2", stroke_linecap: "round", stroke_linejoin: "round", polygon { points: "6 3 20 12 6 21 6 3" } }',
+    "Download": 'svg { class: "size-4", xmlns: "http://www.w3.org/2000/svg", view_box: "0 0 24 24", fill: "none", stroke: "currentColor", stroke_width: "2", stroke_linecap: "round", stroke_linejoin: "round", path { d: "M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" } }',
+    "Briefcase": 'svg { class: "size-4", xmlns: "http://www.w3.org/2000/svg", view_box: "0 0 24 24", fill: "none", stroke: "currentColor", stroke_width: "2", stroke_linecap: "round", stroke_linejoin: "round", path { d: "M16 20V4a2 2 0 0 0-2-2h-4a2 2 0 0 0-2 2v16" } rect { width: "20", height: "14", x: "2", y: "6", rx: "2" } }',
+    "BarChart": 'svg { class: "size-4", xmlns: "http://www.w3.org/2000/svg", view_box: "0 0 24 24", fill: "none", stroke: "currentColor", stroke_width: "2", stroke_linecap: "round", stroke_linejoin: "round", line { x1: "12", x2: "12", y1: "20", y2: "10" } line { x1: "18", x2: "18", y1: "20", y2: "4" } line { x1: "6", x2: "6", y1: "20", y2: "16" } }',
+    "Cpu": 'svg { class: "size-4", xmlns: "http://www.w3.org/2000/svg", view_box: "0 0 24 24", fill: "none", stroke: "currentColor", stroke_width: "2", stroke_linecap: "round", stroke_linejoin: "round", rect { width: "16", height: "16", x: "4", y: "4", rx: "2" } rect { width: "6", height: "6", x: "9", y: "9", rx: "1" } }',
+    "Image": 'svg { class: "size-4", xmlns: "http://www.w3.org/2000/svg", view_box: "0 0 24 24", fill: "none", stroke: "currentColor", stroke_width: "2", stroke_linecap: "round", stroke_linejoin: "round", rect { width: "18", height: "18", x: "3", y: "3", rx: "2", ry: "2" } circle { cx: "9", cy: "9", r: "2" } path { d: "m21 15-3.086-3.086a2 2 0 0 0-2.828 0L6 21" } }',
+    "FileText": 'svg { class: "size-4", xmlns: "http://www.w3.org/2000/svg", view_box: "0 0 24 24", fill: "none", stroke: "currentColor", stroke_width: "2", stroke_linecap: "round", stroke_linejoin: "round", path { d: "M15 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V7Z" } path { d: "M14 2v4a2 2 0 0 0 2 2h4" } }',
+    "Copy": 'svg { class: "size-4", xmlns: "http://www.w3.org/2000/svg", view_box: "0 0 24 24", fill: "none", stroke: "currentColor", stroke_width: "2", stroke_linecap: "round", stroke_linejoin: "round", rect { width: "14", height: "14", x: "8", y: "8", rx: "2", ry: "2" } path { d: "M4 16c-1.1 0-2-.9-2-2V4c0-1.1.9-2 2-2h10c1.1 0 2 .9 2 2" } }',
+    "CircleCheck": 'svg { class: "size-4", xmlns: "http://www.w3.org/2000/svg", view_box: "0 0 24 24", fill: "none", stroke: "currentColor", stroke_width: "2", stroke_linecap: "round", stroke_linejoin: "round", circle { cx: "12", cy: "12", r: "10" } path { d: "m9 12 2 2 4-4" } }',
+    "ArrowUpRight": 'svg { class: "size-4", xmlns: "http://www.w3.org/2000/svg", view_box: "0 0 24 24", fill: "none", stroke: "currentColor", stroke_width: "2", stroke_linecap: "round", stroke_linejoin: "round", path { d: "M7 7h10v10" } path { d: "M7 17 17 7" } }',
+    "ArrowDown": 'svg { class: "size-4", xmlns: "http://www.w3.org/2000/svg", view_box: "0 0 24 24", fill: "none", stroke: "currentColor", stroke_width: "2", stroke_linecap: "round", stroke_linejoin: "round", path { d: "M12 5v14" } path { d: "m19 12-7 7-7-7" } }',
+    "ArrowUp": 'svg { class: "size-4", xmlns: "http://www.w3.org/2000/svg", view_box: "0 0 24 24", fill: "none", stroke: "currentColor", stroke_width: "2", stroke_linecap: "round", stroke_linejoin: "round", path { d: "m5 12 7-7 7 7" } path { d: "M12 19V5" } }',
+    "CircleAlert": 'svg { class: "size-4", xmlns: "http://www.w3.org/2000/svg", view_box: "0 0 24 24", fill: "none", stroke: "currentColor", stroke_width: "2", stroke_linecap: "round", stroke_linejoin: "round", circle { cx: "12", cy: "12", r: "10" } line { x1: "12", x2: "12", y1: "8", y2: "12" } line { x1: "12", x2: "12.01", y1: "16", y2: "16" } }',
+    "CircleX": 'svg { class: "size-4", xmlns: "http://www.w3.org/2000/svg", view_box: "0 0 24 24", fill: "none", stroke: "currentColor", stroke_width: "2", stroke_linecap: "round", stroke_linejoin: "round", circle { cx: "12", cy: "12", r: "10" } path { d: "m15 9-6 6" } path { d: "m9 9 6 6" } }',
+    "Twitter": 'svg { class: "size-4", xmlns: "http://www.w3.org/2000/svg", view_box: "0 0 24 24", fill: "none", stroke: "currentColor", stroke_width: "2", stroke_linecap: "round", stroke_linejoin: "round", path { d: "M22 4s-.7 2.1-2 3.4c1.6 10-9.4 17.3-18 11.6 2.2.1 4.4-.6 6-2C3 15.5.5 9.6 3 5c2.2 2.6 5.6 4.1 9 4-.9-4.2 4-6.6 7-3.8 1.1 0 3-1.2 3-1.2z" } }',
+    "Linkedin": 'svg { class: "size-4", xmlns: "http://www.w3.org/2000/svg", view_box: "0 0 24 24", fill: "none", stroke: "currentColor", stroke_width: "2", stroke_linecap: "round", stroke_linejoin: "round", path { d: "M16 8a6 6 0 0 1 6 6v7h-4v-7a2 2 0 0 0-2-2 2 2 0 0 0-2 2v7h-4v-7a6 6 0 0 1 6-6z" } rect { width: "4", height: "12", x: "2", y: "9" } circle { cx: "4", cy: "4", r: "2" } }',
+    "Award": 'svg { class: "size-4", xmlns: "http://www.w3.org/2000/svg", view_box: "0 0 24 24", fill: "none", stroke: "currentColor", stroke_width: "2", stroke_linecap: "round", stroke_linejoin: "round", path { d: "m15.477 12.89 1.515 8.526a.5.5 0 0 1-.81.47l-3.58-2.687a1 1 0 0 0-1.197 0l-3.586 2.686a.5.5 0 0 1-.81-.469l1.514-8.526" } circle { cx: "12", cy: "8", r: "6" } }',
+    "BatteryCharging": 'svg { class: "size-4", xmlns: "http://www.w3.org/2000/svg", view_box: "0 0 24 24", fill: "none", stroke: "currentColor", stroke_width: "2", stroke_linecap: "round", stroke_linejoin: "round", path { d: "M15 7h1a2 2 0 0 1 2 2v6a2 2 0 0 1-2 2h-2" } path { d: "M6 7H4a2 2 0 0 0-2 2v6a2 2 0 0 0 2 2h1" } path { d: "M22 11v2" } path { d: "M7.5 7l3 5h-3l3 5" } }',
+    "Building2": 'svg { class: "size-4", xmlns: "http://www.w3.org/2000/svg", view_box: "0 0 24 24", fill: "none", stroke: "currentColor", stroke_width: "2", stroke_linecap: "round", stroke_linejoin: "round", path { d: "M6 22V4a2 2 0 0 1 2-2h8a2 2 0 0 1 2 2v18Z" } path { d: "M6 12H4a2 2 0 0 0-2 2v6a2 2 0 0 0 2 2h2" } path { d: "M18 9h2a2 2 0 0 1 2 2v9a2 2 0 0 1-2 2h-2" } path { d: "M10 6h4" } path { d: "M10 10h4" } path { d: "M10 14h4" } path { d: "M10 18h4" } }',
+    "Cog": 'svg { class: "size-4", xmlns: "http://www.w3.org/2000/svg", view_box: "0 0 24 24", fill: "none", stroke: "currentColor", stroke_width: "2", stroke_linecap: "round", stroke_linejoin: "round", path { d: "M12 20a8 8 0 1 0 0-16 8 8 0 0 0 0 16Z" } path { d: "M12 14a2 2 0 1 0 0-4 2 2 0 0 0 0 4Z" } path { d: "M12 2v2" } path { d: "M12 22v-2" } path { d: "m17 20.66-1-1.73" } path { d: "M11 10.27 7 3.34" } path { d: "m20.66 17-1.73-1" } path { d: "m3.34 7 1.73 1" } path { d: "M14 12h8" } path { d: "M2 12h2" } path { d: "m20.66 7-1.73 1" } path { d: "m3.34 17 1.73-1" } path { d: "m17 3.34-1 1.73" } path { d: "m11 13.73-4 6.93" } }',
+    "GitPullRequest": 'svg { class: "size-4", xmlns: "http://www.w3.org/2000/svg", view_box: "0 0 24 24", fill: "none", stroke: "currentColor", stroke_width: "2", stroke_linecap: "round", stroke_linejoin: "round", circle { cx: "18", cy: "18", r: "3" } circle { cx: "6", cy: "6", r: "3" } path { d: "M13 6h3a2 2 0 0 1 2 2v7" } path { d: "M6 9v12" } }',
+    "HandHelping": 'svg { class: "size-4", xmlns: "http://www.w3.org/2000/svg", view_box: "0 0 24 24", fill: "none", stroke: "currentColor", stroke_width: "2", stroke_linecap: "round", stroke_linejoin: "round", path { d: "M11 12h2a2 2 0 1 0 0-4h-3c-.6 0-1.1.2-1.4.6L3 14" } path { d: "m7 18 1.6-1.4c.3-.4.8-.6 1.4-.6h4c1.1 0 2.1-.4 2.8-1.2l4.6-4.4a2 2 0 0 0-2.75-2.91l-4.2 3.9" } path { d: "m2 13 6 6" } }',
+    "HeartHandshake": 'svg { class: "size-4", xmlns: "http://www.w3.org/2000/svg", view_box: "0 0 24 24", fill: "none", stroke: "currentColor", stroke_width: "2", stroke_linecap: "round", stroke_linejoin: "round", path { d: "M19 14c1.49-1.46 3-3.21 3-5.5A5.5 5.5 0 0 0 16.5 3c-1.76 0-3 .5-4.5 2-1.5-1.5-2.74-2-4.5-2A5.5 5.5 0 0 0 2 8.5c0 2.3 1.5 4.05 3 5.5l7 7Z" } path { d: "M12 5 9.04 7.96a2.17 2.17 0 0 0 0 3.08c.82.82 2.13.85 3 .07l2.07-1.9a2.82 2.82 0 0 1 3.79 0 2.6 2.6 0 0 1 0 3.56L12 18" } }',
+    "Leaf": 'svg { class: "size-4", xmlns: "http://www.w3.org/2000/svg", view_box: "0 0 24 24", fill: "none", stroke: "currentColor", stroke_width: "2", stroke_linecap: "round", stroke_linejoin: "round", path { d: "M11 20A7 7 0 0 1 9.8 6.9C15.5 4.9 17 3.5 19 2c1 2 2 4.5 2 8 0 5.5-4.78 10-10 10Z" } path { d: "M2 21c0-3 1.85-5.36 5.08-6C9.5 14.52 12 13 13 12" } }',
+    "PenTool": 'svg { class: "size-4", xmlns: "http://www.w3.org/2000/svg", view_box: "0 0 24 24", fill: "none", stroke: "currentColor", stroke_width: "2", stroke_linecap: "round", stroke_linejoin: "round", path { d: "M15.707 21.293a1 1 0 0 1-1.414 0l-1.586-1.586a1 1 0 0 1 0-1.414l5.586-5.586a1 1 0 0 1 1.414 0l1.586 1.586a1 1 0 0 1 0 1.414z" } path { d: "m18 13-1.375-6.874a1 1 0 0 0-.746-.776L3.235 2.028a1 1 0 0 0-1.207 1.207L5.35 15.879a1 1 0 0 0 .776.746L13 18" } path { d: "m2.3 2.3 7.286 7.286" } circle { cx: "11", cy: "11", r: "2" } }',
+    "RadioTower": 'svg { class: "size-4", xmlns: "http://www.w3.org/2000/svg", view_box: "0 0 24 24", fill: "none", stroke: "currentColor", stroke_width: "2", stroke_linecap: "round", stroke_linejoin: "round", path { d: "M4.9 16.1C1 12.2 1 5.8 4.9 1.9" } path { d: "M7.8 4.7a6.14 6.14 0 0 0-.8 7.5" } path { d: "M16.2 4.7a6.14 6.14 0 0 1 .8 7.5" } path { d: "M19.1 1.9a10.14 10.14 0 0 1 0 14.2" } path { d: "M9.56 14.24a2.74 2.74 0 0 0 4.88 0" } path { d: "M12 22v-8.5" } circle { cx: "12", cy: "12", r: "2" } }',
+    "Shrub": 'svg { class: "size-4", xmlns: "http://www.w3.org/2000/svg", view_box: "0 0 24 24", fill: "none", stroke: "currentColor", stroke_width: "2", stroke_linecap: "round", stroke_linejoin: "round", path { d: "M12 22v-7l-2-2" } path { d: "M17 8v.8A6 6 0 0 1 13.8 20H10A6.5 6.5 0 0 1 7 8a5 5 0 0 1 10 0Z" } path { d: "m14 14-2 2" } }',
+    "SquareKanban": 'svg { class: "size-4", xmlns: "http://www.w3.org/2000/svg", view_box: "0 0 24 24", fill: "none", stroke: "currentColor", stroke_width: "2", stroke_linecap: "round", stroke_linejoin: "round", rect { width: "18", height: "18", x: "3", y: "3", rx: "2" } path { d: "M8 7v7" } path { d: "M12 7v4" } path { d: "M16 7v9" } }',
+    "Trophy": 'svg { class: "size-4", xmlns: "http://www.w3.org/2000/svg", view_box: "0 0 24 24", fill: "none", stroke: "currentColor", stroke_width: "2", stroke_linecap: "round", stroke_linejoin: "round", path { d: "M6 9H4.5a2.5 2.5 0 0 1 0-5H6" } path { d: "M18 9h1.5a2.5 2.5 0 0 0 0-5H18" } path { d: "M4 22h16" } path { d: "M10 14.66V17c0 .55-.47.98-.97 1.21C7.85 18.75 7 20.24 7 22" } path { d: "M14 14.66V17c0 .55.47.98.97 1.21C16.15 18.75 17 20.24 17 22" } path { d: "M18 2H6v7a6 6 0 0 0 12 0V2Z" } }',
+    "WandSparkles": 'svg { class: "size-4", xmlns: "http://www.w3.org/2000/svg", view_box: "0 0 24 24", fill: "none", stroke: "currentColor", stroke_width: "2", stroke_linecap: "round", stroke_linejoin: "round", path { d: "m21.64 3.64-1.28-1.28a1.21 1.21 0 0 0-1.72 0L2.36 18.64a1.21 1.21 0 0 0 0 1.72l1.28 1.28a1.2 1.2 0 0 0 1.72 0L21.64 5.36a1.2 1.2 0 0 0 0-1.72Z" } path { d: "m14 7 3 3" } path { d: "M5 6v4" } path { d: "M19 14v4" } path { d: "M10 2v2" } path { d: "M7 8H3" } path { d: "M21 16h-4" } path { d: "M11 3H9" } }',
+}
+
+
+# ---------------------------------------------------------------------------
+# Fetcher (reused from shadcn_to_rails)
+# ---------------------------------------------------------------------------
+
+def fetch_registry(name, style="new-york", url=None):
+    """Fetch component/block data from shadcn registry."""
+    target_url = url or f"{REGISTRY_BASE}/{name}.json"
+    print(f"  Fetching: {target_url}")
+    req = urllib.request.Request(target_url, headers={"User-Agent": "shadcn-to-dioxus/1.0"})
+    try:
+        with urllib.request.urlopen(req) as resp:
+            return json.loads(resp.read().decode())
+    except urllib.error.HTTPError as e:
+        print(f"  ERROR: HTTP {e.code} for {target_url}")
+        return None
+    except Exception as e:
+        print(f"  ERROR: {e}")
+        return None
+
+
+def fetch_github(github_urls):
+    """Fetch TSX/JSX files from GitHub URLs."""
+    collected = []
+
+    for url in github_urls:
+        url = url.rstrip("/")
+
+        if "github.com" in url and "/blob/" in url:
+            raw_url = url.replace("github.com", "raw.githubusercontent.com").replace("/blob/", "/")
+            print(f"  Fetching: {url}")
+            try:
+                req = urllib.request.Request(raw_url, headers={"User-Agent": "shadcn-to-dioxus/1.0"})
+                with urllib.request.urlopen(req) as resp:
+                    content = resp.read().decode("utf-8")
+                filename = raw_url.split("/")[-1]
+                collected.append((filename, content, url))
+                print(f"  Loaded: {filename}")
+            except Exception as e:
+                print(f"  ERROR fetching {url}: {e}")
+                continue
+
+        elif "github.com" in url and "/tree/" in url:
+            parts = url.replace("https://github.com/", "").split("/")
+            user, repo = parts[0], parts[1]
+            branch = parts[3]
+            dir_path = "/".join(parts[4:]) if len(parts) > 4 else ""
+            api_url = f"https://api.github.com/repos/{user}/{repo}/contents/{dir_path}?ref={branch}"
+            print(f"  Listing directory: {url}")
+            try:
+                req = urllib.request.Request(api_url, headers={
+                    "User-Agent": "shadcn-to-dioxus/1.0",
+                    "Accept": "application/vnd.github.v3+json",
+                })
+                with urllib.request.urlopen(req) as resp:
+                    items = json.loads(resp.read().decode("utf-8"))
+            except Exception as e:
+                print(f"  ERROR listing {api_url}: {e}")
+                continue
+
+            file_items = []
+            dir_items = []
+            for item in items:
+                if item["type"] == "file" and (item["name"].endswith(".tsx") or item["name"].endswith(".jsx")):
+                    file_items.append(item)
+                elif item["type"] == "dir":
+                    dir_items.append(item)
+
+            for item in file_items:
+                raw_url = item.get("download_url", "")
+                if not raw_url:
+                    continue
+                try:
+                    req = urllib.request.Request(raw_url, headers={"User-Agent": "shadcn-to-dioxus/1.0"})
+                    with urllib.request.urlopen(req) as resp:
+                        content = resp.read().decode("utf-8")
+                    collected.append((item["name"], content, raw_url))
+                    print(f"  Loaded: {item['name']}")
+                except Exception as e:
+                    print(f"  ERROR fetching {item['name']}: {e}")
+
+            for item in dir_items:
+                sub_url = f"https://github.com/{user}/{repo}/tree/{branch}/{item['path']}"
+                sub_data = fetch_github([sub_url])
+                if sub_data:
+                    for f in sub_data.get("files", []):
+                        collected.append((Path(f["path"]).name, f["content"], f["path"]))
+
+        elif "raw.githubusercontent.com" in url:
+            print(f"  Fetching: {url}")
+            try:
+                req = urllib.request.Request(url, headers={"User-Agent": "shadcn-to-dioxus/1.0"})
+                with urllib.request.urlopen(req) as resp:
+                    content = resp.read().decode("utf-8")
+                filename = url.split("/")[-1]
+                collected.append((filename, content, url))
+                print(f"  Loaded: {filename}")
+            except Exception as e:
+                print(f"  ERROR fetching {url}: {e}")
+                continue
+        else:
+            print(f"  WARNING: Unsupported URL format: {url}")
+
+    if not collected:
+        print("  ERROR: No files fetched from GitHub.")
+        return None
+
+    def sort_key(item):
+        stem = Path(item[0]).stem.lower()
+        return (0, item[0]) if stem in ("page", "index") else (1, item[0])
+    collected.sort(key=sort_key)
+
+    files = []
+    for i, (filename, content, src) in enumerate(collected):
+        stem = Path(filename).stem.lower()
+        if stem in ("page", "index"):
+            file_type = "registry:page"
+        elif i == 0:
+            file_type = "registry:page"
+        else:
+            file_type = "registry:component"
+        files.append({"path": filename, "content": content, "type": file_type})
+
+    return {
+        "type": "registry:block",
+        "description": f"GitHub: {', '.join(u for _, _, u in collected)}",
+        "files": files,
+    }
+
+
+def load_local_files(file_paths):
+    """Build registry-compatible data from local TSX files."""
+    collected = []
+    for fp in file_paths:
+        p = Path(fp)
+        if not p.exists():
+            print(f"  WARNING: File not found: {fp}")
+            continue
+        if p.is_dir():
+            for ext in ("**/*.tsx", "**/*.jsx"):
+                collected.extend(sorted(p.glob(ext)))
+        else:
+            collected.append(p)
+
+    if not collected:
+        print("  ERROR: No .tsx/.jsx files found.")
+        return None
+
+    def sort_key(f):
+        stem = f.stem.lower()
+        if stem in ("page", "index"):
+            return (0, str(f))
+        return (1, str(f))
+    collected.sort(key=sort_key)
+
+    files = []
+    for i, f in enumerate(collected):
+        content = f.read_text(encoding="utf-8")
+        stem = f.stem.lower()
+        if stem in ("page", "index"):
+            file_type = "registry:page"
+        elif i == 0:
+            file_type = "registry:page"
+        else:
+            file_type = "registry:component"
+        files.append({
+            "path": str(f),
+            "content": content,
+            "type": file_type,
+        })
+        print(f"  Loaded: {f} ({file_type})")
+
+    return {
+        "type": "registry:block",
+        "description": f"Local files: {', '.join(str(f) for f in collected)}",
+        "files": files,
+    }
+
+
+# ---------------------------------------------------------------------------
+# Parser
+# ---------------------------------------------------------------------------
+
+def extract_imports(tsx_content):
+    """Extract import statements and build icon/component maps."""
+    icons = set()
+    components = {}
+
+    for match in re.finditer(
+        r'import\s+\{([^}]+)\}\s+from\s+["\']([^"\']+)["\']', tsx_content
+    ):
+        names = [n.strip() for n in match.group(1).split(",") if n.strip()]
+        source = match.group(2)
+
+        if "lucide-react" in source:
+            icons.update(names)
+        else:
+            for name in names:
+                components[name] = source
+
+    return {"icons": icons, "components": components}
+
+
+def extract_props_defaults(tsx_content):
+    """Extract React component props with their default values."""
+    defaults = {}
+
+    prop_block_match = re.search(
+        r'(?:const\s+\w+\s*=\s*\(\s*\{|function\s+\w+\s*\(\s*\{)(.*?)\}\s*(?::\s*\w+(?:\s*=\s*\{\})?)?\s*\)\s*(?:=>)?\s*\{',
+        tsx_content, flags=re.DOTALL
+    )
+    if not prop_block_match:
+        return defaults
+
+    props_str = prop_block_match.group(1)
+
+    # Simple string defaults
+    for m in re.finditer(r'(\w+)\s*=\s*("(?:[^"\\]|\\.)*")', props_str):
+        defaults[m.group(1)] = m.group(2)
+    for m in re.finditer(r'(\w+)\s*=\s*(\d+(?:\.\d+)?)\s*[,}]', props_str):
+        defaults[m.group(1)] = m.group(2)
+
+    # JSX element defaults: prop = <Component ... />
+    for m in re.finditer(r'(\w+)\s*=\s*(<\w+[^>]*/\s*>)', props_str):
+        prop_name = m.group(1)
+        if prop_name not in defaults:
+            defaults[prop_name] = m.group(2)
+
+    # Object defaults
+    for m in re.finditer(r'(\w+)\s*=\s*\{', props_str):
+        prop_name = m.group(1)
+        start = m.end() - 1
+        depth = 0
+        pos = start
+        while pos < len(props_str):
+            ch = props_str[pos]
+            if ch == '{':
+                depth += 1
+            elif ch == '}':
+                depth -= 1
+                if depth == 0:
+                    obj_str = props_str[start:pos + 1]
+                    defaults[prop_name] = obj_str.strip()
+                    break
+            elif ch in ('"', "'"):
+                quote = ch
+                pos += 1
+                while pos < len(props_str) and props_str[pos] != quote:
+                    if props_str[pos] == '\\':
+                        pos += 1
+                    pos += 1
+            pos += 1
+
+    # Array defaults
+    for m in re.finditer(r'(\w+)\s*=\s*\[', props_str):
+        prop_name = m.group(1)
+        if prop_name in defaults:
+            continue
+        start = m.end() - 1
+        depth = 0
+        pos = start
+        while pos < len(props_str):
+            ch = props_str[pos]
+            if ch == '[':
+                depth += 1
+            elif ch == ']':
+                depth -= 1
+                if depth == 0:
+                    arr_str = props_str[start:pos + 1]
+                    defaults[prop_name] = arr_str.strip()
+                    break
+            elif ch in ('"', "'"):
+                quote = ch
+                pos += 1
+                while pos < len(props_str) and props_str[pos] != quote:
+                    if props_str[pos] == '\\':
+                        pos += 1
+                    pos += 1
+            pos += 1
+
+    # Const variable references
+    for m in re.finditer(r'(\w+)\s*=\s*([a-z]\w*)\s*[,}]', props_str):
+        prop_name = m.group(1)
+        var_name = m.group(2)
+        if prop_name not in defaults:
+            # Try array reference: const varName = [...]
+            const_match = re.search(
+                rf'const\s+{re.escape(var_name)}\s*(?::\s*[^=]+)?\s*=\s*(\[.*?\]);',
+                tsx_content, flags=re.DOTALL
+            )
+            if const_match:
+                defaults[prop_name] = const_match.group(1).strip()
+                continue
+            # Try object reference: const varName = { ... }
+            obj_match = re.search(
+                rf'const\s+{re.escape(var_name)}\s*(?::\s*[^=]+)?\s*=\s*\{{',
+                tsx_content
+            )
+            if obj_match:
+                start = obj_match.end() - 1
+                depth = 0
+                pos = start
+                while pos < len(tsx_content):
+                    ch = tsx_content[pos]
+                    if ch == '{':
+                        depth += 1
+                    elif ch == '}':
+                        depth -= 1
+                        if depth == 0:
+                            obj_str = tsx_content[start:pos + 1]
+                            defaults[prop_name] = obj_str.strip()
+                            break
+                    elif ch in ('"', "'", '`'):
+                        quote = ch
+                        pos += 1
+                        while pos < len(tsx_content) and tsx_content[pos] != quote:
+                            if tsx_content[pos] == '\\':
+                                pos += 1
+                            pos += 1
+                    pos += 1
+
+    return defaults
+
+
+def extract_jsx_body(tsx_content):
+    """Extract the JSX return body from a TSX component.
+
+    Uses the LAST `return (` that contains JSX (starts with `<`),
+    which is the component's render return — earlier returns are
+    typically inside hooks (useEffect cleanup, callbacks, etc.).
+    """
+    # Find ALL `return (` positions
+    candidates = list(re.finditer(r'\breturn\s*\(', tsx_content))
+    if not candidates:
+        match = re.search(r'\breturn\s*(<)', tsx_content)
+        if not match:
+            return tsx_content
+        return tsx_content[match.start() + len(match.group(0)) - 1:].strip()
+
+    # Try from last match backwards — the component JSX return is typically the last one
+    for match in reversed(candidates):
+        start = match.end()
+        depth = 1
+        pos = start
+        while pos < len(tsx_content) and depth > 0:
+            ch = tsx_content[pos]
+            if ch == '(':
+                depth += 1
+            elif ch == ')':
+                depth -= 1
+            elif ch in ('"', "'", '`'):
+                quote = ch
+                pos += 1
+                while pos < len(tsx_content) and tsx_content[pos] != quote:
+                    if tsx_content[pos] == '\\':
+                        pos += 1
+                    pos += 1
+            pos += 1
+        body = tsx_content[start:pos - 1].strip()
+        # Verify this return contains JSX (starts with <)
+        if body.startswith('<'):
+            return body
+
+    # Fallback: use last candidate regardless
+    match = candidates[-1]
+    start = match.end()
+    depth = 1
+    pos = start
+    while pos < len(tsx_content) and depth > 0:
+        ch = tsx_content[pos]
+        if ch == '(':
+            depth += 1
+        elif ch == ')':
+            depth -= 1
+        elif ch in ('"', "'", '`'):
+            quote = ch
+            pos += 1
+            while pos < len(tsx_content) and tsx_content[pos] != quote:
+                if tsx_content[pos] == '\\':
+                    pos += 1
+                pos += 1
+        pos += 1
+    return tsx_content[start:pos - 1].strip()
+
+
+def extract_component_name(tsx_content):
+    """Extract the component function name.
+
+    Priority:
+    1. export default function Name
+    2. export function Name (PascalCase)
+    3. function Name (PascalCase, not helper like 'default...')
+    4. export const Name = (PascalCase)
+    5. const Name = (PascalCase)
+    6. Fallback: "Component"
+    """
+    def is_pascal(name):
+        return name[0].isupper() and not name.isupper()
+
+    # 1. export default function Name
+    m = re.search(r'export\s+default\s+function\s+(\w+)', tsx_content)
+    if m and is_pascal(m.group(1)):
+        return m.group(1)
+
+    # 2. export function Name (PascalCase)
+    for m in re.finditer(r'export\s+function\s+(\w+)', tsx_content):
+        if is_pascal(m.group(1)):
+            return m.group(1)
+
+    # 3. function Name (PascalCase, skip helpers)
+    for m in re.finditer(r'(?<!export\s)function\s+(\w+)', tsx_content):
+        if is_pascal(m.group(1)):
+            return m.group(1)
+
+    # 4. export const Name = (arrow function / React.FC)
+    for m in re.finditer(r'export\s+(?:default\s+)?(?:const|let)\s+(\w+)\s*[=:]', tsx_content):
+        if is_pascal(m.group(1)):
+            return m.group(1)
+
+    # 5. const Name = (PascalCase)
+    for m in re.finditer(r'(?:const|let)\s+(\w+)\s*[=:]', tsx_content):
+        if is_pascal(m.group(1)):
+            return m.group(1)
+
+    return "Component"
+
+
+# ---------------------------------------------------------------------------
+# JSX → RSX Transformer
+# ---------------------------------------------------------------------------
+
+def _parse_js_object(obj_str):
+    """Parse a simple JS object literal into a Python dict."""
+    result = {}
+    for m in re.finditer(r'(\w+)\s*:\s*("(?:[^"\\]|\\.)*"|\'(?:[^\'\\]|\\.)*\')', obj_str):
+        key = m.group(1)
+        val = m.group(2).strip('"').strip("'")
+        result[key] = val
+    return result
+
+
+def _parse_js_array(arr_str):
+    """Parse a simple JS array of objects into a Python list of dicts."""
+    result = []
+    depth = 0
+    start = None
+    for i, ch in enumerate(arr_str):
+        if ch == '{':
+            if depth == 0:
+                start = i
+            depth += 1
+        elif ch == '}':
+            depth -= 1
+            if depth == 0 and start is not None:
+                result.append(_parse_js_object(arr_str[start:i + 1]))
+                start = None
+    return result
+
+
+def _remove_react_fragments(jsx):
+    """Remove React.Fragment and Fragment wrappers, keeping children."""
+    result = jsx
+    result = re.sub(r'<React\.Fragment\s*>', '', result)
+    result = re.sub(r'</React\.Fragment>', '', result)
+    result = re.sub(r'<Fragment\s*>', '', result)
+    result = re.sub(r'</Fragment>', '', result)
+    result = re.sub(r'<>', '', result)
+    result = re.sub(r'</>', '', result)
+    return result
+
+
+def _convert_inline_styles(jsx):
+    """Convert JSX inline styles to RSX style attribute.
+
+    style={{ transform: "rotate(45deg)", opacity: 0.5 }}
+    → style="transform: rotate(45deg); opacity: 0.5"
+    """
+    result = jsx
+
+    def replace_style(m):
+        inner = m.group(1).strip()
+        inner = re.sub(r'\.\.\.(\w+),?\s*', '', inner)
+        pairs = []
+        for pm in re.finditer(r'(\w+)\s*:\s*("([^"]*)"|\'([^\']*)\'|([^,}\s]+))', inner):
+            prop = pm.group(1)
+            val = pm.group(3) or pm.group(4) or pm.group(5) or ""
+            css_prop = re.sub(r'([a-z])([A-Z])', lambda x: x.group(1) + '-' + x.group(2).lower(), prop)
+            pairs.append(f'{css_prop}: {val}')
+        if pairs:
+            return f'style="{"; ".join(pairs)}"'
+        return ''
+
+    result = re.sub(r'style=\{\{([^}]*(?:\{[^}]*\}[^}]*)*)\}\}', replace_style, result)
+    return result
+
+
+def _convert_template_literals(jsx):
+    """Convert JSX template literals to Rust format strings.
+
+    {`text-${var}`} → "text-{var}"
+    class={`foo ${bar}`} → class="foo {bar}"
+    """
+    result = jsx
+
+    def replace_attr_template(m):
+        attr = m.group(1)
+        template = m.group(2)
+        converted = re.sub(r'\$\{([^}]+)\}', r'{\1}', template)
+        return f'{attr}="{converted}"'
+    result = re.sub(r'(\w+)=\{`([^`]*)`\}', replace_attr_template, result)
+
+    def replace_text_template(m):
+        template = m.group(1)
+        converted = re.sub(r'\$\{([^}]+)\}', r'{\1}', template)
+        return f'"{converted}"'
+    result = re.sub(r'\{`([^`]*)`\}', replace_text_template, result)
+
+    return result
+
+
+def _parse_nested_js_object(obj_str):
+    """Parse a JS object literal recursively, returning nested dicts for sub-objects."""
+    result = {}
+    # Remove outer braces
+    inner = obj_str.strip()
+    if inner.startswith('{') and inner.endswith('}'):
+        inner = inner[1:-1].strip()
+
+    pos = 0
+    while pos < len(inner):
+        # Skip whitespace
+        while pos < len(inner) and inner[pos] in ' \t\n\r,':
+            pos += 1
+        if pos >= len(inner):
+            break
+
+        # Match key
+        key_match = re.match(r'(\w+)\s*:\s*', inner[pos:])
+        if not key_match:
+            pos += 1
+            continue
+
+        key = key_match.group(1)
+        pos += key_match.end()
+
+        if pos >= len(inner):
+            break
+
+        ch = inner[pos]
+        if ch == '{':
+            # Nested object
+            depth = 0
+            start = pos
+            while pos < len(inner):
+                if inner[pos] == '{':
+                    depth += 1
+                elif inner[pos] == '}':
+                    depth -= 1
+                    if depth == 0:
+                        result[key] = _parse_nested_js_object(inner[start:pos + 1])
+                        pos += 1
+                        break
+                elif inner[pos] in ('"', "'"):
+                    q = inner[pos]
+                    pos += 1
+                    while pos < len(inner) and inner[pos] != q:
+                        if inner[pos] == '\\':
+                            pos += 1
+                        pos += 1
+                pos += 1
+        elif ch == '[':
+            # Array — skip for now
+            depth = 0
+            start = pos
+            while pos < len(inner):
+                if inner[pos] == '[':
+                    depth += 1
+                elif inner[pos] == ']':
+                    depth -= 1
+                    if depth == 0:
+                        pos += 1
+                        break
+                pos += 1
+        elif ch == '<':
+            # JSX element value: <Component ... />
+            jsx_match = re.match(r'(<\w+[^>]*/\s*>)', inner[pos:])
+            if jsx_match:
+                result[key] = jsx_match.group(1)
+                pos += jsx_match.end()
+            else:
+                pos += 1
+        elif ch in ('"', "'"):
+            # String value
+            q = ch
+            pos += 1
+            start = pos
+            while pos < len(inner) and inner[pos] != q:
+                if inner[pos] == '\\':
+                    pos += 1
+                pos += 1
+            result[key] = inner[start:pos]
+            pos += 1
+        else:
+            # Number, boolean, identifier
+            val_match = re.match(r'([^\s,}]+)', inner[pos:])
+            if val_match:
+                result[key] = val_match.group(1)
+                pos += val_match.end()
+
+    return result
+
+
+def _flatten_nested_obj(prefix, obj):
+    """Flatten nested dict to dotted keys: {a: {b: "c"}} → {"a.b": "c"}."""
+    flat = {}
+    for k, v in obj.items():
+        full_key = f"{prefix}.{k}"
+        if isinstance(v, dict):
+            flat.update(_flatten_nested_obj(full_key, v))
+        else:
+            flat[full_key] = v
+    return flat
+
+
+def _parse_js_array_of_objects(arr_str):
+    """Parse a JS array of object literals: [{a: "1", b: "2"}, ...] → list of dicts."""
+    arr_str = arr_str.strip()
+    if not (arr_str.startswith('[') and arr_str.endswith(']')):
+        return []
+    inner = arr_str[1:-1].strip()
+    if not inner:
+        return []
+
+    items = []
+    pos = 0
+    while pos < len(inner):
+        while pos < len(inner) and inner[pos] in ' \t\n\r,':
+            pos += 1
+        if pos >= len(inner):
+            break
+        if inner[pos] == '{':
+            depth = 0
+            start = pos
+            while pos < len(inner):
+                if inner[pos] == '{':
+                    depth += 1
+                elif inner[pos] == '}':
+                    depth -= 1
+                    if depth == 0:
+                        obj_str = inner[start:pos + 1]
+                        parsed = _parse_nested_js_object(obj_str)
+                        if parsed:
+                            items.append(parsed)
+                        pos += 1
+                        break
+                elif inner[pos] in ('"', "'"):
+                    q = inner[pos]
+                    pos += 1
+                    while pos < len(inner) and inner[pos] != q:
+                        if inner[pos] == '\\':
+                            pos += 1
+                        pos += 1
+                pos += 1
+        else:
+            pos += 1
+    return items
+
+
+def _unroll_for_loop(jsx, array_name, items):
+    """Find {for item in arrayName { ... }} and unroll it with actual array data."""
+    pattern = r'\{for\s+(\w+)\s+in\s+' + re.escape(array_name) + r'\s*\{'
+    m = re.search(pattern, jsx)
+    if not m:
+        return jsx
+
+    item_var = m.group(1)
+    start_inner = m.end() - 1
+    depth = 0
+    pos = start_inner
+    inner_end = None
+    while pos < len(jsx):
+        if jsx[pos] == '{':
+            depth += 1
+        elif jsx[pos] == '}':
+            depth -= 1
+            if depth == 0:
+                inner_end = pos
+                break
+        elif jsx[pos] in ('"', "'"):
+            q = jsx[pos]
+            pos += 1
+            while pos < len(jsx) and jsx[pos] != q:
+                if jsx[pos] == '\\':
+                    pos += 1
+                pos += 1
+        pos += 1
+
+    if inner_end is None:
+        return jsx
+
+    outer_end = inner_end + 1
+    rest = jsx[outer_end:].lstrip()
+    if rest.startswith('}'):
+        outer_end = outer_end + (len(jsx[outer_end:]) - len(rest)) + 1
+
+    body_template = jsx[start_inner + 1:inner_end].strip()
+
+    blocks = []
+    for idx, item in enumerate(items):
+        block = body_template
+        flat = _flatten_nested_obj(item_var, item)
+        for dotted_key in sorted(flat.keys(), key=len, reverse=True):
+            val = flat[dotted_key]
+            if isinstance(val, str) and val.startswith('<'):
+                icon_rsx = _resolve_jsx_icon_default(val)
+                if icon_rsx:
+                    escaped = re.escape(dotted_key).replace(r'\.', r'\??\.')
+                    block = re.sub(r'\{' + escaped + r'\}', icon_rsx, block)
+                    continue
+            escaped = re.escape(dotted_key).replace(r'\.', r'\??\.')
+            block = re.sub(
+                r'(\w+)=\{' + escaped + r'\}',
+                r'\1="' + str(val).replace('\\', '\\\\') + '"',
+                block
+            )
+            block = re.sub(
+                r'\{' + escaped + r'\}',
+                '"' + str(val) + '"',
+                block
+            )
+        # Replace {index} and {idx} with actual index number
+        block = re.sub(r'\{index\}', str(idx), block)
+        block = re.sub(r'\{idx\}', str(idx), block)
+        # Replace template literals like item-{index} in attribute values
+        block = re.sub(r'item-\{index\}', f'item-{idx}', block)
+        block = re.sub(r'item-\{idx\}', f'item-{idx}', block)
+        blocks.append(block)
+
+    replacement = '\n'.join(blocks)
+    return jsx[:m.start()] + replacement + jsx[outer_end:]
+
+
+def _resolve_jsx_icon_default(val):
+    """If val is a JSX icon like '<Wifi className="size-6" />', return RSX SVG string.
+
+    Returns None if not a known icon.
+    """
+    m = re.match(r'<(\w+)\s*(.*?)\s*/>', val.strip())
+    if not m:
+        return None
+    icon_name = m.group(1)
+    attrs_str = m.group(2)
+    if icon_name not in LUCIDE_ICONS:
+        return None
+    icon_rsx = LUCIDE_ICONS[icon_name]
+    # Extract className from the JSX attrs if present
+    cm = re.search(r'className="([^"]*)"', attrs_str)
+    if cm:
+        custom_class = cm.group(1)
+        # Replace the default size-4 class with the custom one
+        icon_rsx = re.sub(r'class:\s*"[^"]*"', f'class: "{custom_class}"', icon_rsx, count=1)
+    return icon_rsx
+
+
+def _inline_props_defaults(jsx, props_defaults):
+    """Replace simple prop references with their default values."""
+    result = jsx
+
+    for prop_name, default_val in props_defaults.items():
+        # Check for JSX icon default: <IconName className="..." />
+        if default_val.startswith('<'):
+            icon_rsx = _resolve_jsx_icon_default(default_val)
+            if icon_rsx:
+                result = re.sub(
+                    r'\{' + re.escape(prop_name) + r'\}',
+                    icon_rsx,
+                    result
+                )
+            continue
+        if default_val.startswith('"') and default_val.endswith('"'):
+            plain_val = default_val.strip('"')
+            result = re.sub(
+                r'\{' + re.escape(prop_name) + r'\}',
+                f'"{plain_val}"',
+                result
+            )
+        elif default_val.startswith('{'):
+            # Parse with nested support
+            nested = _parse_nested_js_object(default_val)
+            flat = _flatten_nested_obj(prop_name, nested)
+
+            # Replace deepest paths first (e.g. buttons.primary.text before buttons.primary)
+            for dotted_key in sorted(flat.keys(), key=len, reverse=True):
+                val = flat[dotted_key]
+                # Check if value is a JSX icon
+                if isinstance(val, str) and val.startswith('<'):
+                    icon_rsx = _resolve_jsx_icon_default(val)
+                    if icon_rsx:
+                        escaped_key_optional = re.escape(dotted_key).replace(r'\.', r'\??\.')
+                        result = re.sub(
+                            r'\{' + escaped_key_optional + r'\}',
+                            icon_rsx,
+                            result
+                        )
+                        continue
+                # Optional chaining: buttons.primary?.text → buttons.primary.text
+                escaped_key_optional = re.escape(dotted_key).replace(r'\.', r'\??\.')
+                # attr={obj.a.b} → attr="val"
+                result = re.sub(
+                    r'(\w+)=\{' + escaped_key_optional + r'\}',
+                    r'\1="' + str(val).replace('\\', '\\\\') + '"',
+                    result
+                )
+                # {obj.a.b} → "val"
+                result = re.sub(
+                    r'\{' + escaped_key_optional + r'\}',
+                    f'"{val}"',
+                    result
+                )
+
+            # Also handle simple one-level access (fallback)
+            obj = _parse_js_object(default_val)
+            for key, val in obj.items():
+                result = re.sub(
+                    r'(\w+)=\{' + re.escape(prop_name) + r'\.' + re.escape(key) + r'\}',
+                    r'\1="' + val.replace('\\', '\\\\') + '"',
+                    result
+                )
+                result = re.sub(
+                    r'\{' + re.escape(prop_name) + r'\.' + re.escape(key) + r'\}',
+                    f'"{val}"',
+                    result
+                )
+        elif default_val.lstrip().startswith('['):
+            # Parse array of objects and unroll for loops
+            array_items = _parse_js_array_of_objects(default_val)
+            if array_items:
+                result = _unroll_for_loop(result, prop_name, array_items)
+        else:
+            result = re.sub(
+                r'\{' + re.escape(prop_name) + r'\}',
+                str(default_val),
+                result
+            )
+
+    return result
+
+
+def _remove_conditional_rendering(jsx):
+    """Remove JSX conditional rendering, keeping content.
+
+    {cond && (<html>...</html>)}  → <html>...</html>
+    {condition ? (<a>) : (<b>)}   → <a>
+    """
+    result = jsx
+
+    # Pattern 1: {expr && (<html>...</html>)}
+    pattern = r'\{[^{}]*?\s*&&\s*\('
+    iterations = 0
+    while iterations < 50:
+        m = re.search(pattern, result)
+        if not m:
+            break
+        iterations += 1
+        start_brace = m.start()
+        paren_start = m.end() - 1
+        depth = 0
+        pos = paren_start
+        while pos < len(result):
+            ch = result[pos]
+            if ch == '(':
+                depth += 1
+            elif ch == ')':
+                depth -= 1
+                if depth == 0:
+                    rest = result[pos + 1:].lstrip()
+                    if rest.startswith('}'):
+                        end = pos + 1 + (len(result[pos + 1:]) - len(rest)) + 1
+                        body = result[paren_start + 1:pos].strip()
+                        result = result[:start_brace] + body + result[end:]
+                    break
+            pos += 1
+        else:
+            break
+
+    # Pattern 2: {identifier && <tag>...</tag>}
+    result = re.sub(
+        r'\{(\w+(?:\.\w+)*)\s*&&\s*(<[a-z][^}]*>(?:[^{}]*?)</[a-z]\w*>)\s*\}',
+        r'\2',
+        result, flags=re.DOTALL
+    )
+
+    # Pattern 2b: {complex_expr && <tag>...</tag>}
+    result = re.sub(
+        r'\{[^{}]*?\s*&&\s*(<[a-zA-Z][^}]*>(?:[^{}]*?)</[a-zA-Z]\w*>)\s*\}',
+        r'\1',
+        result, flags=re.DOTALL
+    )
+
+    # Pattern 3: {identifier && <SelfClosing />}
+    result = re.sub(
+        r'\{(\w+(?:\.\w+)*)\s*&&\s*(<[a-zA-Z][^}]*?/>)\s*\}',
+        r'\2',
+        result
+    )
+
+    # Pattern 3b: {complex_expr && <SelfClosing />}
+    result = re.sub(
+        r'\{[^{}]*?\s*&&\s*(<[a-zA-Z][^}]*?/>)\s*\}',
+        r'\1',
+        result
+    )
+
+    # Pattern 4: Simple ternary {cond ? <a> : <b>} → keep truthy branch
+    result = re.sub(
+        r'\{[^{}]+\?\s*(<[^{}]+?>(?:[^{}]*?)<\/[^{}]+?>)\s*:\s*(?:<[^{}]+?>(?:[^{}]*?)<\/[^{}]+?>|null|"")\s*\}',
+        r'\1',
+        result, flags=re.DOTALL
+    )
+
+    # Pattern 5: {cond ? "text" : "other"} → "text"
+    result = re.sub(
+        r'\{[^{}]+\?\s*"([^"]*)"\s*:\s*"[^"]*"\s*\}',
+        r'"\1"',
+        result
+    )
+
+    return result
+
+
+def _convert_map_to_for(jsx):
+    """Convert JSX .map() iterations to RSX for loops.
+
+    {items.map((item) => ( <div>{item.name}</div> ))}
+    → for item in items { div { "{item.name}" } }
+    """
+    result = jsx
+
+    # Pattern 1: {arrayName.map((item, idx?) => ( ... ))}
+    pattern = r'\{([\w.]+)\.map\(\((\w+)(?:,\s*(\w+))?\)\s*=>\s*\('
+    for m in re.finditer(pattern, result):
+        start = m.end() - 1
+        depth = 0
+        pos = start
+        while pos < len(result):
+            ch = result[pos]
+            if ch == '(':
+                depth += 1
+            elif ch == ')':
+                depth -= 1
+                if depth == 0:
+                    end = pos + 1
+                    rest = result[end:].lstrip()
+                    if rest.startswith(')}'):
+                        end = end + (len(result[end:]) - len(result[end:].lstrip())) + 2
+                    body = result[start + 1:pos]
+
+                    array_name = m.group(1)
+                    item_var = m.group(2)
+
+                    # Remove key={...}
+                    body = re.sub(r'\s+key=\{[^}]*\}', '', body)
+
+                    replacement = f'{{for {item_var} in {array_name} {{\n{body.strip()}\n}}}}'
+                    result = result[:m.start()] + replacement + result[end:]
+                    break
+            elif ch in ('"', "'", '`'):
+                quote = ch
+                pos += 1
+                while pos < len(result) and result[pos] != quote:
+                    if result[pos] == '\\':
+                        pos += 1
+                    pos += 1
+            pos += 1
+        break
+
+    # Pattern 2: {arr.map((item) => { return (...) })}
+    pattern2 = r'\{([\w.]+)\.map\(\((\w+)(?:,\s*(\w+))?\)\s*=>\s*\{'
+    for m in re.finditer(pattern2, result):
+        start = m.end() - 1
+        depth = 0
+        pos = start
+        while pos < len(result):
+            ch = result[pos]
+            if ch == '{':
+                depth += 1
+            elif ch == '}':
+                depth -= 1
+                if depth == 0:
+                    end = pos + 1
+                    rest = result[end:].lstrip()
+                    if rest.startswith(')}'):
+                        end = end + (len(result[end:]) - len(result[end:].lstrip())) + 2
+                    body = result[start + 1:pos]
+                    return_match = re.search(r'return\s*\((.*)\)', body, flags=re.DOTALL)
+                    if return_match:
+                        body = return_match.group(1)
+                    else:
+                        return_match2 = re.search(r'return\s+(.*)', body, flags=re.DOTALL)
+                        if return_match2:
+                            body = return_match2.group(1)
+
+                    array_name = m.group(1)
+                    item_var = m.group(2)
+                    body = re.sub(r'\s+key=\{[^}]*\}', '', body)
+
+                    replacement = f'{{for {item_var} in {array_name} {{\n{body.strip()}\n}}}}'
+                    result = result[:m.start()] + replacement + result[end:]
+                    break
+            elif ch in ('"', "'", '`'):
+                quote = ch
+                pos += 1
+                while pos < len(result) and result[pos] != quote:
+                    if result[pos] == '\\':
+                        pos += 1
+                    pos += 1
+            pos += 1
+        break
+
+    # Pattern 3: {arr.map((item) => <SingleLine />)}
+    def replace_map_single_line(m):
+        array_name = m.group(1)
+        item_var = m.group(2)
+        body = m.group(3)
+        body = re.sub(r'\s+key=\{[^}]*\}', '', body)
+        return f'{{for {item_var} in {array_name} {{\n{body.strip()}\n}}}}'
+
+    result = re.sub(
+        r'\{([\w.]+)\.map\(\((\w+)\)\s*=>\s*(<[A-Za-z][^)]*?/>)\s*\)\}',
+        replace_map_single_line, result
+    )
+
+    # Repeat for remaining .map() calls
+    if re.search(r'\{[\w.]+\.map\(', result) and result != jsx:
+        result = _convert_map_to_for(result)
+
+    return result
+
+
+def _convert_dangerous_inner_html(jsx):
+    """Convert dangerouslySetInnerHTML to dangerous_inner_html.
+
+    <div dangerouslySetInnerHTML={{ __html: content }} />
+    → div { dangerous_inner_html: "{content}" }
+    """
+    result = jsx
+
+    def replace_dangerous_self(m):
+        tag = m.group(1)
+        attrs = m.group(2) or ""
+        html_expr = m.group(3).strip()
+        clean_attrs = re.sub(r'\s*dangerouslySetInnerHTML=\{\{[^}]*\}\}', '', attrs).strip()
+        if html_expr.startswith('"') or html_expr.startswith("'"):
+            inner = html_expr.strip('"').strip("'")
+        else:
+            inner = f'{{{html_expr}}}'
+        attr_str = f' {clean_attrs}' if clean_attrs else ''
+        return f'<{tag}{attr_str} dangerouslySetInnerHTML="{inner}"/>'
+
+    result = re.sub(
+        r'<(\w+)(\s[^>]*)?\s+dangerouslySetInnerHTML=\{\{\s*__html:\s*([^}]+)\}\}\s*/>',
+        replace_dangerous_self, result
+    )
+
+    return result
+
+
+def _convert_object_attr_access(jsx, props_defaults):
+    """Convert remaining object property access in attributes.
+
+    attr={obj.prop} → attr="resolved_value" or attr="{obj.prop}"
+    """
+    result = jsx
+
+    def replace_obj_attr(m):
+        attr = m.group(1)
+        obj_name = m.group(2)
+        prop_name = m.group(3)
+
+        if obj_name in props_defaults:
+            default_val = props_defaults[obj_name]
+            if default_val.startswith('{'):
+                obj = _parse_js_object(default_val)
+                if prop_name in obj:
+                    return f'{attr}="{obj[prop_name]}"'
+
+        return f'{attr}="{{{obj_name}.{prop_name}}}"'
+
+    result = re.sub(r'(\w+)=\{(\w+)\.(\w+)\}', replace_obj_attr, result)
+    return result
+
+
+# ---------------------------------------------------------------------------
+# Tooltip → CSS-only tooltip converter (pre-processing, runs on JSX)
+# ---------------------------------------------------------------------------
+
+def _convert_tooltips_to_css(jsx):
+    """Convert Tooltip/TooltipTrigger/TooltipContent to CSS-only hover tooltips.
+
+    Input pattern:
+        <Tooltip>
+          <TooltipTrigger asChild>
+            <span className="...">label</span>
+          </TooltipTrigger>
+          <TooltipContent>
+            <p>tooltip text</p>
+          </TooltipContent>
+        </Tooltip>
+
+    Output pattern:
+        <span className="group relative inline-block">
+          <span className="... cursor-pointer">label</span>
+          <div className="pointer-events-none absolute bottom-full left-1/2 z-50 mb-2 -translate-x-1/2 opacity-0 transition-opacity group-hover:pointer-events-auto group-hover:opacity-100">
+            <div className="w-64 rounded-md border bg-popover px-3 py-2 text-sm text-popover-foreground shadow-md">
+              <p>tooltip text</p>
+            </div>
+          </div>
+        </span>
+    """
+    result = jsx
+
+    # Remove TooltipProvider wrapper (already handled by SUB_COMPONENT_MAP unwrap)
+    # Remove asChild from TooltipTrigger
+    result = re.sub(r'(<TooltipTrigger)\s+asChild', r'\1', result)
+
+    # Convert <Tooltip>...<TooltipTrigger>trigger</TooltipTrigger>...<TooltipContent>content</TooltipContent>...</Tooltip>
+    tooltip_pattern = re.compile(
+        r'<Tooltip[^>]*>\s*'
+        r'<TooltipTrigger[^>]*>\s*(.*?)\s*</TooltipTrigger>\s*'
+        r'<TooltipContent[^>]*>\s*(.*?)\s*</TooltipContent>\s*'
+        r'</Tooltip>',
+        re.DOTALL
+    )
+
+    def replace_tooltip(m):
+        trigger = m.group(1).strip()
+        content = m.group(2).strip()
+        return (
+            f'<span className="group relative inline-block">\n'
+            f'  {trigger}\n'
+            f'  <div className="pointer-events-none absolute bottom-full left-1/2 z-50 mb-2 -translate-x-1/2 opacity-0 transition-opacity group-hover:pointer-events-auto group-hover:opacity-100">\n'
+            f'    <div className="w-64 rounded-md border bg-popover px-3 py-2 text-sm text-popover-foreground shadow-md">\n'
+            f'      {content}\n'
+            f'    </div>\n'
+            f'  </div>\n'
+            f'</span>'
+        )
+
+    result = tooltip_pattern.sub(replace_tooltip, result)
+    return result
+
+
+# Button style constants for asChild conversion
+_BTN_BASE = "inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md text-sm font-medium"
+_BTN_VARIANTS = {
+    "default": f"{_BTN_BASE} h-10 px-4 py-2 bg-primary text-primary-foreground shadow hover:bg-primary/90",
+    "destructive": f"{_BTN_BASE} h-10 px-4 py-2 bg-destructive text-destructive-foreground shadow-sm hover:bg-destructive/90",
+    "outline": f"{_BTN_BASE} h-10 px-4 py-2 border border-input bg-background shadow-sm hover:bg-accent hover:text-accent-foreground",
+    "secondary": f"{_BTN_BASE} h-10 px-4 py-2 bg-secondary text-secondary-foreground shadow-sm hover:bg-secondary/80",
+    "ghost": f"{_BTN_BASE} h-10 px-4 py-2 hover:bg-accent hover:text-accent-foreground",
+    "link": f"{_BTN_BASE} h-10 px-4 py-2 text-primary underline-offset-4 hover:underline",
+}
+_BTN_SIZES = {
+    "default": "",
+    "sm": "h-9 rounded-md px-3",
+    "lg": "h-11 rounded-md px-8",
+    "icon": "size-10",
+}
+
+
+def _convert_button_as_child(jsx):
+    """Convert <Button asChild ...><a ...>text</a></Button> to <a className="btn-styles ..." ...>text</a>.
+
+    The asChild pattern in shadcn means the Button renders as its child element
+    with the button's styles merged into the child's className.
+    """
+    result = jsx
+
+    # Match <Button asChild ...><a ...>...</a></Button>
+    pattern = re.compile(
+        r'<Button\s+([^>]*?)asChild([^>]*?)>\s*'
+        r'(<[a-zA-Z][^>]*>)'  # opening child tag
+        r'(.*?)'              # child content
+        r'(</[a-zA-Z]+>)\s*'  # closing child tag
+        r'</Button>',
+        re.DOTALL
+    )
+
+    def replace_btn(m):
+        btn_attrs_before = m.group(1).strip()
+        btn_attrs_after = m.group(2).strip()
+        child_open = m.group(3)
+        child_content = m.group(4)
+        child_close = m.group(5)
+
+        btn_attrs = f"{btn_attrs_before} {btn_attrs_after}".strip()
+
+        # Extract variant
+        variant_match = re.search(r'variant="(\w+)"', btn_attrs)
+        variant = variant_match.group(1) if variant_match else "default"
+
+        # Extract size
+        size_match = re.search(r'size="(\w+)"', btn_attrs)
+        size = size_match.group(1) if size_match else "default"
+
+        # Extract extra className from Button
+        btn_class_match = re.search(r'className="([^"]*)"', btn_attrs)
+        btn_extra_class = btn_class_match.group(1) if btn_class_match else ""
+
+        # Build button class
+        btn_class = _BTN_VARIANTS.get(variant, _BTN_VARIANTS["default"])
+        size_class = _BTN_SIZES.get(size, "")
+        if size_class:
+            btn_class = btn_class + " " + size_class
+        if btn_extra_class:
+            btn_class = btn_class + " " + btn_extra_class
+
+        # Merge into child tag's className
+        child_class_match = re.search(r'className="([^"]*)"', child_open)
+        if child_class_match:
+            merged = btn_class + " " + child_class_match.group(1)
+            child_open = child_open[:child_class_match.start()] + f'className="{merged}"' + child_open[child_class_match.end():]
+        else:
+            # Insert className before closing >
+            child_open = child_open[:-1] + f' className="{btn_class}">'
+
+        return f'{child_open}{child_content}{child_close}'
+
+    result = pattern.sub(replace_btn, result)
+    return result
+
+
+# ---------------------------------------------------------------------------
+# JSX → RSX Main Transformer
+# ---------------------------------------------------------------------------
+
+def jsx_to_rsx(jsx_str, icons=None, props_defaults=None):
+    """Convert a JSX string to Dioxus RSX format."""
+    if icons is None:
+        icons = set()
+    if props_defaults is None:
+        props_defaults = {}
+
+    result = jsx_str
+
+    # 0a. Pre-process: Convert Tooltip components to CSS-only pattern (before tag conversion)
+    result = _convert_tooltips_to_css(result)
+
+    # 0b. Remove React callback refs: ref={(ref) => ...} and ref={someRef}
+    result = re.sub(r'\s+ref=\{[^}]*(?:\{[^}]*\}[^}]*)*\}', '', result)
+    result = re.sub(r'\s+ref=\{\([^)]*\)\s*=>[^}]*\}', '', result)
+
+    # 0c. Convert Button asChild pattern: <Button asChild ...><a ...>text</a></Button> → <a ... className="btn-styles ...">text</a>
+    result = _convert_button_as_child(result)
+
+    # 1. Remove React-specific imports and exports
+    result = re.sub(r'^\s*import\s+.*$', '', result, flags=re.MULTILINE)
+    result = re.sub(r'^\s*export\s+(default\s+)?', '', result, flags=re.MULTILINE)
+
+    # 2. Replace {" "} with a space
+    result = result.replace('{" "}', '" "')
+
+    # 3. Replace HTML entities
+    result = result.replace("&apos;", "'")
+    result = result.replace("&ldquo;", "\u201C")
+    result = result.replace("&rdquo;", "\u201D")
+    result = result.replace("&lsquo;", "\u2018")
+    result = result.replace("&rsquo;", "\u2019")
+    result = result.replace("&mdash;", "\u2014")
+    result = result.replace("&ndash;", "\u2013")
+    result = result.replace("&hellip;", "\u2026")
+    result = result.replace("&amp;", "&")
+    result = result.replace("&nbsp;", " ")
+    result = result.replace("&lt;", "<")
+    result = result.replace("&gt;", ">")
+
+    # 4. Replace JSX comments {/* ... */}
+    result = re.sub(r'\{/\*.*?\*/\}', lambda m: f'// {m.group(0)[3:-3].strip()}', result, flags=re.DOTALL)
+
+    # 5. Remove React.Fragment wrappers
+    result = _remove_react_fragments(result)
+
+    # 6. Convert dangerouslySetInnerHTML
+    result = _convert_dangerous_inner_html(result)
+
+    # 6.5. Fix dark-mode classes
+    result = re.sub(r'\s*dark:invert', '', result)  # logos invisible on dark bg
+    result = re.sub(r'\s*dark:prose-invert', '', result)  # prose colors handled in CSS
+
+    # 6.6. Replace non-existent fictional-company-logo URLs with real logos
+    FICTIONAL_LOGO_MAP = {
+        "logos/company/fictional-company-logo-1.svg": "logos/astro-wordmark.svg",
+        "logos/company/fictional-company-logo-2.svg": "logos/vercel-wordmark.svg",
+        "logos/company/fictional-company-logo-3.svg": "logos/figma-wordmark.svg",
+        "logos/company/fictional-company-logo-4.svg": "logos/supabase-wordmark.svg",
+        "logos/company/fictional-company-logo-5.svg": "logos/tailwind-wordmark.svg",
+    }
+    for old_path, new_path in FICTIONAL_LOGO_MAP.items():
+        result = result.replace(old_path, new_path)
+
+    # 7. Convert JSX inline styles: style={{...}} → style="..."
+    result = _convert_inline_styles(result)
+
+    # 8. Convert template literals
+    result = _convert_template_literals(result)
+
+    # 9. Inline prop defaults
+    if props_defaults:
+        result = _inline_props_defaults(result, props_defaults)
+
+    # 10. Convert .map() to for loops
+    result = _convert_map_to_for(result)
+
+    # 10.5. Unroll for loops with array prop defaults (must run after map→for conversion)
+    if props_defaults:
+        for prop_name, default_val in props_defaults.items():
+            if isinstance(default_val, str) and default_val.lstrip().startswith('['):
+                array_items = _parse_js_array_of_objects(default_val)
+                if array_items:
+                    result = _unroll_for_loop(result, prop_name, array_items)
+
+    # 11. Convert object property access
+    result = _convert_object_attr_access(result, props_defaults)
+
+    # 12. Remove JSX conditional rendering
+    result = _remove_conditional_rendering(result)
+
+    # 13. Replace Lucide icons
+    for icon_name in icons:
+        def replace_icon(m, _icon_name=icon_name):
+            attrs_str = m.group(2) or ""
+            cls_match = re.search(r'className="([^"]*)"', attrs_str)
+            icon_class = cls_match.group(1) if cls_match else "size-4"
+            if _icon_name in LUCIDE_ICONS:
+                svg = LUCIDE_ICONS[_icon_name]
+                svg = re.sub(r'class: "[^"]*"', f'class: "{icon_class}"', svg, count=1)
+                # If className has fill-* (e.g. fill-yellow-400), change fill attr to currentColor
+                if re.search(r'fill-\w+', icon_class):
+                    svg = svg.replace('fill: "none"', 'fill: "currentColor"')
+                return svg
+            else:
+                return f'// TODO: Lucide icon "{_icon_name}" class="{icon_class}"'
+
+        pattern = rf'<({re.escape(icon_name)})\s*((?:[^>]*?))\s*/>'
+        result = re.sub(pattern, replace_icon, result)
+
+    # 14. Now convert JSX tags to RSX format
+    result = _convert_jsx_to_rsx_tags(result)
+
+    # 15. Quote unquoted text nodes in RSX
+    result = _quote_text_nodes(result)
+
+    # 16. Fix indentation
+    result = _fix_rsx_indentation(result)
+
+    # 17. Clean up excessive blank lines
+    result = re.sub(r'\n{3,}', '\n\n', result)
+
+    return result.strip()
+
+
+def _quote_text_nodes(rsx):
+    """Quote bare text nodes in RSX output.
+
+    In RSX, text must be quoted: "text here"
+    This handles text that appears after a comma+newline inside { } blocks.
+    """
+    lines = rsx.split('\n')
+    result_lines = []
+
+    for line in lines:
+        stripped = line.strip()
+
+        # Skip empty lines, comments, lines that are already RSX constructs
+        if not stripped:
+            result_lines.append(line)
+            continue
+
+        # Skip lines that are already quoted, are RSX elements, attributes, or braces
+        if (stripped.startswith('"') or stripped.startswith('//') or
+            stripped.startswith('{') or stripped.startswith('}') or
+            stripped.endswith('{') or
+            stripped.endswith(',') or
+            stripped == '}' or
+            re.match(r'^[a-z_][a-zA-Z0-9_]*\s*\{', stripped) or  # tag {
+            re.match(r'^[A-Z][a-zA-Z0-9]*\s*\{', stripped) or    # Component {
+            re.match(r'^[a-z_]+:', stripped) or                    # attr: value
+            re.match(r'^(for|if|else|match)\b', stripped) or       # control flow
+            re.match(r'^(svg|path|circle|rect|line|polyline|polygon|ellipse|use)\s*\{', stripped) or
+            re.match(r'^(pub |fn |use |#\[)', stripped)):
+            result_lines.append(line)
+            continue
+
+        # If the line is pure text (letters, spaces, punctuation, no RSX syntax)
+        if re.match(r'^[^{}<>]+$', stripped) and not re.match(r'^\w+:\s', stripped):
+            indent = line[:len(line) - len(line.lstrip())]
+            # Skip if already a properly quoted string (from props inlining)
+            if re.match(r'^".*"$', stripped):
+                result_lines.append(line)
+                continue
+            quoted = _escape_rsx_string(stripped)
+            result_lines.append(f'{indent}"{quoted}"')
+        # Handle text followed by } on same line, e.g. "Welcome back}"
+        elif re.match(r'^[^{}<>]+\}+$', stripped) and not re.match(r'^\w+:\s', stripped):
+            indent = line[:len(line) - len(line.lstrip())]
+            # Count trailing braces
+            brace_count = len(stripped) - len(stripped.rstrip('}'))
+            text = stripped[:len(stripped) - brace_count].strip()
+            braces = '}' * brace_count
+            if text and not text.startswith('"'):
+                quoted = _escape_rsx_string(text)
+                result_lines.append(f'{indent}"{quoted}"{braces}')
+            else:
+                result_lines.append(line)
+        # Handle mixed text content lines: "text before a {" or after "} text"
+        elif (re.match(r'^[A-Z][a-z]', stripped) and not re.match(r'^[A-Z]\w+\s*\{', stripped)):
+            indent = line[:len(line) - len(line.lstrip())]
+            quoted = _escape_rsx_string(stripped)
+            result_lines.append(f'{indent}"{quoted}"')
+        else:
+            result_lines.append(line)
+
+    return '\n'.join(result_lines)
+
+
+def _fix_rsx_indentation(rsx):
+    """Fix indentation of RSX output to be consistent."""
+    lines = rsx.split('\n')
+    result_lines = []
+    indent_level = 0
+
+    for line in lines:
+        stripped = line.strip()
+        if not stripped:
+            result_lines.append('')
+            continue
+
+        # Decrease indent for closing braces
+        close_count = 0
+        for ch in stripped:
+            if ch == '}':
+                close_count += 1
+            else:
+                break
+
+        if close_count > 0 and stripped == '}' * close_count:
+            indent_level = max(0, indent_level - close_count)
+            result_lines.append('    ' * indent_level + stripped)
+            continue
+
+        if stripped.startswith('}'):
+            indent_level = max(0, indent_level - 1)
+
+        result_lines.append('    ' * indent_level + stripped)
+
+        # Increase indent for opening braces (at end of line)
+        open_count = stripped.count('{') - stripped.count('}')
+        indent_level = max(0, indent_level + open_count)
+
+    return '\n'.join(result_lines)
+
+
+def _convert_jsx_to_rsx_tags(jsx):
+    """Convert JSX tag syntax to RSX (Dioxus) syntax.
+
+    This is the core transformation:
+    <div className="foo" onClick={handler}>text</div>
+    → div { class: "foo", onclick: move |_| { handler },
+        "text"
+      }
+    """
+    # We'll do a multi-pass approach using regex
+
+    result = jsx
+
+    # Pass 1: Handle known Dioxus components (from COMPONENT_MAP) - self-closing
+    for comp_name, config in sorted(COMPONENT_MAP.items(), key=lambda x: len(x[0]), reverse=True):
+        rsx_name = config["component"]
+
+        def replace_self_closing_comp(m, _rsx_name=rsx_name, _config=config):
+            attrs = m.group(1) or ""
+            rsx_attrs = _convert_attrs_to_rsx(attrs, _config.get("props_map", {}))
+            if _config.get("auto_index"):
+                # AccordionItem needs index prop
+                pass
+            if rsx_attrs:
+                return f'{_rsx_name} {{ {rsx_attrs} }}'
+            return f'{_rsx_name} {{}}'
+
+        result = re.sub(
+            rf'<{re.escape(comp_name)}\s*((?:[^>]*?))\s*/>',
+            replace_self_closing_comp, result
+        )
+
+        # Block components
+        def replace_block_comp(m, _rsx_name=rsx_name, _config=config):
+            attrs = m.group(1) or ""
+            children = m.group(2) or ""
+            rsx_attrs = _convert_attrs_to_rsx(attrs, _config.get("props_map", {}))
+            children = children.strip()
+            parts = []
+            if rsx_attrs:
+                parts.append(rsx_attrs)
+            if children:
+                if rsx_attrs:
+                    # Add comma after attributes before children
+                    return f'{_rsx_name} {{\n{rsx_attrs},\n{children}\n}}'
+                return f'{_rsx_name} {{\n{children}\n}}'
+            if rsx_attrs:
+                return f'{_rsx_name} {{ {rsx_attrs} }}'
+            return f'{_rsx_name} {{}}'
+
+        pattern = rf'<{re.escape(comp_name)}(\s[^>]*)?>(((?!<{re.escape(comp_name)}[\s>]).){{0,20000}}?)</{re.escape(comp_name)}>'
+        result = re.sub(pattern, replace_block_comp, result, flags=re.DOTALL)
+
+    # Pass 2: Handle sub-components (SUB_COMPONENT_MAP)
+    sorted_subs = sorted(SUB_COMPONENT_MAP.keys(), key=len, reverse=True)
+    for comp_name in sorted_subs:
+        config = SUB_COMPONENT_MAP[comp_name]
+        tag = config["tag"]
+        default_class = config.get("class", "")
+        unwrap = config.get("unwrap", False)
+
+        def replace_self_closing_sub(m, _tag=tag, _default_class=default_class, _unwrap=unwrap):
+            attrs = m.group(1) or ""
+            if _unwrap:
+                return ""
+            cls = _extract_classname(attrs)
+            merged = _merge_classes(_default_class, cls)
+            other_attrs = _remove_classname_and_react_attrs(attrs)
+            rsx_attrs = _convert_attrs_to_rsx(other_attrs, {})
+            parts = []
+            if merged:
+                parts.append(f'class: "{merged}"')
+            if rsx_attrs:
+                parts.append(rsx_attrs)
+            attr_str = ", ".join(parts)
+            if attr_str:
+                return f'{_tag} {{ {attr_str} }}'
+            return f'{_tag} {{}}'
+
+        result = re.sub(
+            rf'<{re.escape(comp_name)}\s*((?:[^>]*?))\s*/>',
+            replace_self_closing_sub, result
+        )
+
+        def replace_block_sub(m, _tag=tag, _default_class=default_class, _unwrap=unwrap):
+            attrs = m.group(1) or ""
+            children = m.group(2) or ""
+            if _unwrap:
+                return children.strip()
+            cls = _extract_classname(attrs)
+            merged = _merge_classes(_default_class, cls)
+            other_attrs = _remove_classname_and_react_attrs(attrs)
+            rsx_attrs = _convert_attrs_to_rsx(other_attrs, {})
+            children = children.strip()
+            parts = []
+            if merged:
+                parts.append(f'class: "{merged}"')
+            if rsx_attrs:
+                parts.append(rsx_attrs)
+            if children:
+                parts.append(children)
+            inner = ",\n".join(parts[:(-1 if children else len(parts))])
+            if children:
+                if inner:
+                    inner += ",\n" + children
+                else:
+                    inner = children
+            if inner:
+                return f'{_tag} {{\n{inner}\n}}'
+            return f'{_tag} {{}}'
+
+        pattern = rf'<{re.escape(comp_name)}(\s[^>]*)?>(((?!<{re.escape(comp_name)}[\s>]).){{0,20000}}?)</{re.escape(comp_name)}>'
+        result = re.sub(pattern, replace_block_sub, result, flags=re.DOTALL)
+
+    # Pass 3: Convert remaining HTML tags
+
+    # Self-closing tags: <img src="x" /> → img { src: "x" }
+    def replace_self_closing_html(m):
+        tag = m.group(1)
+        attrs = m.group(2) or ""
+        rsx_attrs = _convert_html_attrs_to_rsx(attrs)
+        if rsx_attrs:
+            return f'{tag} {{ {rsx_attrs} }}'
+        return f'{tag} {{}}'
+
+    result = re.sub(r'<([a-zA-Z][a-zA-Z0-9]*)((?:\s+[^>]*?)?)\s*/>', replace_self_closing_html, result)
+
+    # Block tags (HTML + unknown components): <div class="x">children</div> → div { class: "x", children }
+    # Use bracket-matching approach to find matching close tags
+    iterations = 0
+    while iterations < 500:
+        # Find the first opening tag (HTML or PascalCase component)
+        m = re.search(r'<([a-zA-Z][a-zA-Z0-9]*)(\s[^>]*)?>(?!/)', result)
+        if not m:
+            break
+
+        tag = m.group(1)
+        attrs = m.group(2) or ""
+        start = m.start()
+        content_start = m.end()
+
+        # Find the matching closing tag using depth tracking
+        close_tag = f'</{tag}>'
+        open_pattern = rf'<{re.escape(tag)}[\s>]'
+        depth = 1
+        pos = content_start
+        found = False
+        while pos < len(result):
+            # Check for closing tag
+            if result[pos:pos + len(close_tag)] == close_tag:
+                depth -= 1
+                if depth == 0:
+                    children = result[content_start:pos]
+                    end = pos + len(close_tag)
+                    found = True
+                    break
+                pos += len(close_tag)
+                continue
+            # Check for opening tag of same type
+            om = re.match(open_pattern, result[pos:])
+            if om:
+                depth += 1
+                pos += om.end()
+                continue
+            pos += 1
+
+        if not found:
+            # No matching close tag; skip this tag by converting it in-place
+            # Just skip past this opening tag to avoid infinite loop
+            result = result[:start] + f'{tag} {{ {_convert_html_attrs_to_rsx(attrs)} }}' + result[content_start:]
+            iterations += 1
+            continue
+
+        iterations += 1
+
+        rsx_attrs = _convert_html_attrs_to_rsx(attrs)
+        children = children.strip()
+
+        # Convert text children to quoted strings
+        if children and not re.search(r'[{}<>]', children):
+            # Skip if already a properly quoted string (from props inlining)
+            if not (children.startswith('"') and children.endswith('"')):
+                children = f'"{_escape_rsx_string(children)}"'
+
+        parts = []
+        if rsx_attrs:
+            parts.append(rsx_attrs)
+        if children:
+            parts.append(children)
+
+        if parts:
+            inner = ",\n".join(parts[:(-1 if children else len(parts))])
+            if children:
+                if inner:
+                    inner += ",\n" + children
+                else:
+                    inner = children
+            replacement = f'{tag} {{\n{inner}\n}}'
+        else:
+            replacement = f'{tag} {{}}'
+
+        result = result[:start] + replacement + result[end:]
+
+    # Pass 4: Convert remaining JSX expressions {variable} in text context
+    def replace_expression(m):
+        expr = m.group(1).strip()
+        if expr.startswith('{') or expr.startswith('(') or '=>' in expr:
+            return f'// TODO: {expr}'
+        if expr.startswith('...'):
+            return ''
+        if expr.startswith('/*'):
+            return f'// {expr.strip("/* */")}'
+        if '.map(' in expr:
+            return f'// TODO: {expr}'
+        if re.search(r'\.\w+\(', expr) and not re.match(r'^[\w.]+$', expr):
+            return f'// TODO: {expr}'
+        # In RSX, expressions are just {expr}
+        return f'{{{expr}}}'
+
+    result = re.sub(r'(?<!=)\{([^{}]+)\}', replace_expression, result)
+
+    return result
+
+
+def _convert_attrs_to_rsx(attrs_str, props_map):
+    """Convert JSX attributes string to RSX attribute format.
+
+    className="x" → class: "x"
+    onClick={handler} → onclick: move |_| { handler }
+    disabled → disabled: true
+    """
+    if not attrs_str or not attrs_str.strip():
+        return ""
+
+    parts = []
+    attrs_str = attrs_str.strip()
+
+    # Remove React-specific attrs
+    attrs_str = re.sub(r'\s*collapsible\b', '', attrs_str)
+    attrs_str = re.sub(r'\s*asChild\b', '', attrs_str)
+    attrs_str = re.sub(r'\s*\{\.\.\.(?:props|rest|[a-z]\w*)\}', '', attrs_str)
+    attrs_str = re.sub(r'\s+ref=\{[^}]*\}', '', attrs_str)
+    attrs_str = re.sub(r'\s+key=\{[^}]*\}', '', attrs_str)
+    attrs_str = re.sub(r'\s+key="[^"]*"', '', attrs_str)
+
+    # className="..." → class: "..."
+    for m in re.finditer(r'class(?:Name)?="([^"]*)"', attrs_str):
+        parts.append(f'class: "{m.group(1)}"')
+
+    # className={cn(...)} → class: "..." (extract all string literals, skip ternaries)
+    cn_pattern = r'class(?:Name)?=\{cn\('
+    cn_match = re.search(cn_pattern, attrs_str)
+    if cn_match:
+        # Find matching closing )} by counting parens
+        cn_start = cn_match.start()
+        paren_depth = 0
+        pos = cn_match.end() - 1  # start at the '(' of cn(
+        while pos < len(attrs_str):
+            ch = attrs_str[pos]
+            if ch == '(':
+                paren_depth += 1
+            elif ch == ')':
+                paren_depth -= 1
+                if paren_depth == 0:
+                    # Find closing }
+                    cn_end = pos + 1
+                    if cn_end < len(attrs_str) and attrs_str[cn_end] == '}':
+                        cn_end += 1
+                    cn_body = attrs_str[cn_match.end():pos]
+                    strings = re.findall(r'"([^"]*)"', cn_body)
+                    parts.append(f'class: "{" ".join(strings)}"')
+                    # Remove from attrs_str
+                    attrs_str = attrs_str[:cn_start] + attrs_str[cn_end:]
+                    break
+            elif ch in ('"', "'"):
+                quote = ch
+                pos += 1
+                while pos < len(attrs_str) and attrs_str[pos] != quote:
+                    if attrs_str[pos] == '\\':
+                        pos += 1
+                    pos += 1
+            pos += 1
+
+    # Remove className from attrs_str to avoid double processing
+    attrs_str = re.sub(r'\s*class(?:Name)?="[^"]*"', '', attrs_str)
+
+    # Standard attributes: attr="value"
+    for m in re.finditer(r'(\w+)="([^"]*)"', attrs_str):
+        attr_name = m.group(1)
+        attr_val = m.group(2)
+        if attr_name in ('key', 'ref', 'asChild'):
+            continue
+        rsx_name = ATTR_MAP.get(attr_name, attr_name)
+        # Convert camelCase event handlers
+        if attr_name.startswith('on') and attr_name[2:3].isupper():
+            rsx_name = attr_name.lower()
+        # Use props_map for component-specific remapping
+        if attr_name in props_map:
+            rsx_name = props_map[attr_name]
+        parts.append(f'{rsx_name}: "{attr_val}"')
+
+    # Attributes with JSX expression: attr={expr}
+    for m in re.finditer(r'(\w+)=\{([^}]+)\}', attrs_str):
+        attr_name = m.group(1)
+        expr = m.group(2).strip()
+        if attr_name in ('key', 'ref', 'className', 'class'):
+            continue
+        if attr_name == 'dangerouslySetInnerHTML':
+            parts.append(f'dangerous_inner_html: "{expr}"')
+            continue
+        rsx_name = ATTR_MAP.get(attr_name, attr_name)
+        if attr_name in props_map:
+            rsx_name = props_map[attr_name]
+        # Event handlers
+        if attr_name.startswith('on') and attr_name[2:3].isupper():
+            rsx_name = attr_name.lower()
+            parts.append(f'{rsx_name}: move |_| {{ {expr} }}')
+        elif expr == 'true':
+            parts.append(f'{rsx_name}: true')
+        elif expr == 'false':
+            parts.append(f'{rsx_name}: false')
+        elif re.match(r'^\d+$', expr):
+            parts.append(f'{rsx_name}: "{expr}"')
+        else:
+            parts.append(f'{rsx_name}: {expr}')
+
+    # Boolean attributes: disabled, required, etc.
+    for m in re.finditer(r'\b(disabled|required|checked|readonly|autofocus|multiple|selected|hidden|open)\b(?!=)', attrs_str):
+        attr_name = m.group(1)
+        # Check it's not already part of an attr=val
+        before = attrs_str[:m.start()]
+        if before.rstrip().endswith('='):
+            continue
+        parts.append(f'{attr_name}: true')
+
+    return ", ".join(parts)
+
+
+def _convert_html_attrs_to_rsx(attrs_str):
+    """Convert HTML-style attributes in a tag to RSX format."""
+    return _convert_attrs_to_rsx(attrs_str, {})
+
+
+def _extract_classname(attrs_str):
+    """Extract className/class value from attrs string."""
+    m = re.search(r'class(?:Name)?="([^"]*)"', attrs_str)
+    if m:
+        return m.group(1)
+    cn_match = re.search(r'class(?:Name)?=\{cn\(([^)]+)\)\}', attrs_str)
+    if cn_match:
+        strings = re.findall(r'"([^"]*)"', cn_match.group(1))
+        return " ".join(strings)
+    return ""
+
+
+def _remove_classname_and_react_attrs(attrs_str):
+    """Remove className and React-specific attributes from attrs string."""
+    result = re.sub(r'\s*class(?:Name)?="[^"]*"', '', attrs_str)
+    result = re.sub(r'\s*class(?:Name)?=\{cn\([^)]+\)\}', '', result)
+    result = re.sub(r'\s*asChild', '', result)
+    result = re.sub(r'\s*\{\.\.\.(?:props|rest)\}', '', result)
+    return result
+
+
+def _merge_classes(default, extra):
+    """Merge default Tailwind classes with extra classes."""
+    parts = []
+    if default:
+        parts.append(default.strip())
+    if extra:
+        parts.append(extra.strip())
+    return " ".join(parts)
+
+
+def _escape_rsx_string(text):
+    """Escape a string for RSX."""
+    return text.replace('\\', '\\\\').replace('"', '\\"').replace('\n', '\\n')
+
+
+# ---------------------------------------------------------------------------
+# Output generation
+# ---------------------------------------------------------------------------
+
+def camel_to_snake(name):
+    """Convert CamelCase to snake_case."""
+    s1 = re.sub(r'(.)([A-Z][a-z]+)', r'\1_\2', name)
+    return re.sub(r'([a-z0-9])([A-Z])', r'\1_\2', s1).lower()
+
+
+def snake_to_camel(s):
+    """Convert snake_case to CamelCase."""
+    return "".join(w.capitalize() for w in s.split("_"))
+
+
+def sanitize_filename(name):
+    """Convert component name to valid file path part."""
+    return name.replace("-", "_")
+
+
+def _collect_used_components(rsx_content):
+    """Collect Dioxus component names used in the RSX output."""
+    used = set()
+    for comp_name in COMPONENT_MAP:
+        rsx_name = COMPONENT_MAP[comp_name]["component"]
+        if re.search(rf'\b{re.escape(rsx_name)}\s*\{{', rsx_content):
+            used.add(rsx_name)
+    return sorted(used)
+
+
+def generate_rust_file(component_name, rsx_content):
+    """Generate a complete Rust file with the RSX component."""
+    used_components = _collect_used_components(rsx_content)
+
+    lines = ["use dioxus::prelude::*;"]
+
+    if used_components:
+        imports = ", ".join(used_components)
+        lines.append(f"use crate::components::{{{imports}}};")
+
+    lines.append("")
+    lines.append("#[component]")
+    lines.append(f"pub fn {component_name}() -> Element {{")
+    lines.append("    rsx! {")
+
+    # Indent the RSX content
+    for line in rsx_content.split('\n'):
+        if line.strip():
+            lines.append(f"        {line}")
+        else:
+            lines.append("")
+
+    lines.append("    }")
+    lines.append("}")
+    lines.append("")
+
+    return "\n".join(lines)
+
+
+def write_file(path, content, dry_run=False):
+    """Write content to file, creating directories as needed."""
+    path = Path(path)
+    if dry_run:
+        print(f"\n  [DRY RUN] Would write: {path}")
+        print(f"  {'─'*50}")
+        print(content)
+        print(f"  {'─'*50}")
+        return
+
+    path.parent.mkdir(parents=True, exist_ok=True)
+    with open(path, "w") as f:
+        f.write(content)
+    print(f"  Created: {path}")
+
+
+# ---------------------------------------------------------------------------
+# Main Pipeline
+# ---------------------------------------------------------------------------
+
+def process_component(name, style="new-york", url=None, output_dir=None, dry_run=False,
+                      local_files=None, github_urls=None, _preloaded_data=None, list_deps=False):
+    """Main pipeline: fetch/load → parse → transform → generate."""
+    print(f"\n{'='*60}")
+    print(f"  shadcn_to_dioxus: Converting '{name}'")
+    print(f"{'='*60}\n")
+
+    # 1. Fetch or load
+    if _preloaded_data:
+        data = _preloaded_data
+    elif github_urls:
+        data = fetch_github(github_urls)
+    elif local_files:
+        data = load_local_files(local_files)
+    else:
+        data = fetch_registry(name, style, url)
+    if not data:
+        print("  FAILED: Could not fetch/load component data.")
+        return False
+
+    comp_type = data.get("type", "registry:block")
+    description = data.get("description", "")
+    print(f"  Type: {comp_type}")
+    print(f"  Description: {description}")
+
+    if list_deps:
+        deps = data.get("registryDependencies", [])
+        print(f"\n  Dependencies for '{name}':")
+        for dep in deps:
+            print(f"    - {dep}")
+        return True
+
+    # 2. Process each file
+    files = data.get("files", [])
+    generated_files = []
+
+    for file_info in files:
+        tsx_content = file_info.get("content", "")
+        file_path = file_info.get("path", "")
+        file_type = file_info.get("type", "")
+
+        if not tsx_content:
+            continue
+
+        print(f"\n  Processing: {file_path} ({file_type})")
+
+        # Parse imports
+        imports = extract_imports(tsx_content)
+        icons = imports["icons"]
+        if icons:
+            print(f"    Icons: {', '.join(sorted(icons))}")
+
+        # Extract props defaults
+        props_defaults = extract_props_defaults(tsx_content)
+
+        # Flatten destructured props: const { title, desc } = post;
+        # If post = { title: "X", desc: "Y" }, replace props_defaults so
+        # title="X", desc="Y" instead of post={...}
+        flat_additions = {}
+        remove_keys = []
+        for prop_name, default_val in list(props_defaults.items()):
+            if default_val.startswith('{') and not default_val.startswith('{['):
+                # Look for destructuring: const { a, b, ... } = propName;
+                destr_match = re.search(
+                    rf'const\s*\{{\s*([^}}]+)\}}\s*=\s*{re.escape(prop_name)}\s*;',
+                    tsx_content
+                )
+                if destr_match:
+                    var_names = [v.strip().split(':')[0].strip()
+                                 for v in destr_match.group(1).split(',')
+                                 if v.strip()]
+                    nested = _parse_nested_js_object(default_val)
+                    flat = _flatten_nested_obj(prop_name, nested)
+                    for var in var_names:
+                        key = f"{prop_name}.{var}"
+                        if key in flat:
+                            val = flat[key]
+                            flat_additions[var] = f'"{val}"' if isinstance(val, str) else str(val)
+                    if flat_additions:
+                        remove_keys.append(prop_name)
+        for k in remove_keys:
+            del props_defaults[k]
+        props_defaults.update(flat_additions)
+
+        if props_defaults:
+            print(f"    Props: {', '.join(sorted(props_defaults.keys()))}")
+
+        # Extract module-level const arrays (e.g. const DATA = [...])
+        # These are used with .map() but aren't props
+        for const_m in re.finditer(
+            r'const\s+(\w+)\s*(?::\s*\w+(?:\[\])?\s*)?=\s*(\[)',
+            tsx_content
+        ):
+            const_name = const_m.group(1)
+            if const_name in props_defaults:
+                continue
+            arr_start = const_m.start(2)
+            depth = 0
+            pos = arr_start
+            while pos < len(tsx_content):
+                if tsx_content[pos] == '[':
+                    depth += 1
+                elif tsx_content[pos] == ']':
+                    depth -= 1
+                    if depth == 0:
+                        arr_str = tsx_content[arr_start:pos + 1]
+                        props_defaults[const_name] = arr_str
+                        break
+                elif tsx_content[pos] in ('"', "'", '`'):
+                    q = tsx_content[pos]
+                    pos += 1
+                    while pos < len(tsx_content) and tsx_content[pos] != q:
+                        if tsx_content[pos] == '\\':
+                            pos += 1
+                        pos += 1
+                pos += 1
+
+        # Extract component name (fallback to file/block name)
+        comp_func_name = extract_component_name(tsx_content)
+        if comp_func_name == "Component":
+            comp_func_name = snake_to_camel(sanitize_filename(name))
+
+        # Extract JSX body
+        jsx_body = extract_jsx_body(tsx_content)
+
+        # Transform to RSX
+        rsx_content = jsx_to_rsx(jsx_body, icons, props_defaults)
+
+        # Generate Rust file
+        rust_content = generate_rust_file(comp_func_name, rsx_content)
+
+        # Determine output path
+        safe_name = sanitize_filename(name)
+        if output_dir:
+            base_dir = Path(output_dir)
+        else:
+            base_dir = OUTPUT_BASE
+
+        if file_type == "registry:page":
+            rs_path = base_dir / f"{safe_name}.rs"
+        elif file_type == "registry:component":
+            sub_name = sanitize_filename(camel_to_snake(comp_func_name))
+            rs_path = base_dir / f"{sub_name}.rs"
+        else:
+            rs_path = base_dir / f"{sanitize_filename(Path(file_path).stem)}.rs"
+
+        write_file(rs_path, rust_content, dry_run)
+        generated_files.append(str(rs_path))
+
+    # Summary
+    print(f"\n{'='*60}")
+    print(f"  Done! Generated {len(generated_files)} file(s) for '{name}'")
+    for f in generated_files:
+        print(f"    - {f}")
+    if generated_files and not dry_run:
+        print(f"\n  Add to your mod.rs:")
+        for f in generated_files:
+            mod_name = Path(f).stem
+            print(f"    pub mod {mod_name};")
+    print(f"{'='*60}\n")
+
+    return True
+
+
+# ---------------------------------------------------------------------------
+# CLI
+# ---------------------------------------------------------------------------
+
+def _detect_input_type(source):
+    """Detect input type from source string."""
+    if source.startswith("https://github.com") or source.startswith("https://raw.githubusercontent.com"):
+        return "github", source
+    if Path(source).exists():
+        return "file", source
+    if source.endswith(".tsx") or source.endswith(".jsx"):
+        print(f"  WARNING: File not found: {source}")
+        return "file", source
+    return "registry", source
+
+
+def _derive_name_from_source(source, input_type):
+    """Derive component name from source path/URL."""
+    generic_names = {"page", "index", "component", "src", ".", ""}
+
+    if input_type == "github":
+        url_path = source.rstrip("/").split("/")[-1]
+        name = url_path.replace(".tsx", "").replace(".jsx", "").replace(".json", "")
+        if name.lower() in generic_names:
+            parts = source.rstrip("/").split("/")
+            name = parts[-2] if len(parts) >= 2 else name
+        return name
+    elif input_type == "file":
+        p = Path(source)
+        if p.is_dir():
+            name = p.name
+        else:
+            name = p.stem
+        if name.lower() in generic_names:
+            name = p.parent.name if p.parent.name not in generic_names else name
+        return name
+    else:
+        return source
+
+
+def main():
+    parser = argparse.ArgumentParser(
+        description="Convert React shadcn/ui components to Dioxus RSX (Rust)",
+        epilog="Examples:\n"
+               "  python bin/shadcn_to_dioxus accordion\n"
+               "  python bin/shadcn_to_dioxus login-03 --dry-run\n"
+               "  python bin/shadcn_to_dioxus https://github.com/user/repo/blob/main/src/block/about3.tsx\n"
+               "  python bin/shadcn_to_dioxus ./src/login.tsx\n",
+        formatter_class=argparse.RawDescriptionHelpFormatter,
+    )
+    parser.add_argument("sources", nargs="*", help="Source(s): registry name, GitHub URL, or local file/directory path")
+    parser.add_argument("--style", default="new-york", help="shadcn style (default: new-york)")
+    parser.add_argument("--output", help="Output directory (default: shadcn_dioxus/src/components/)")
+    parser.add_argument("--dry-run", action="store_true", help="Preview without writing files")
+    parser.add_argument("--list-deps", action="store_true", help="Only list dependencies, don't convert")
+
+    args = parser.parse_args()
+
+    if not args.sources:
+        parser.print_help()
+        sys.exit(1)
+
+    # Classify each source
+    github_urls = []
+    local_files = []
+    registry_name = None
+
+    for source in args.sources:
+        input_type, value = _detect_input_type(source)
+        if input_type == "github":
+            github_urls.append(value)
+        elif input_type == "file":
+            local_files.append(value)
+        else:
+            registry_name = value
+
+    # Derive name from first source
+    first_source = args.sources[0]
+    first_type, _ = _detect_input_type(first_source)
+    name = _derive_name_from_source(first_source, first_type)
+
+    if args.list_deps:
+        if registry_name:
+            data = fetch_registry(registry_name, args.style)
+            if data:
+                deps = data.get("registryDependencies", [])
+                print(f"\nDependencies for '{name}':")
+                for dep in deps:
+                    print(f"  - {dep}")
+        else:
+            print("  --list-deps only works with registry sources.")
+        sys.exit(0)
+
+    # Handle batch processing for directories
+    if len(github_urls) == 1 and "/tree/" in github_urls[0]:
+        data = fetch_github(github_urls)
+        if not data:
+            sys.exit(1)
+        total = len(data["files"])
+        ok = 0
+        fail = 0
+        for file_info in data["files"]:
+            fname = Path(file_info["path"]).stem
+            single_data = {
+                "type": "registry:block",
+                "description": file_info["path"],
+                "files": [{"path": file_info["path"], "content": file_info["content"], "type": "registry:page"}],
+            }
+            result = process_component(
+                fname,
+                style=args.style,
+                output_dir=args.output,
+                dry_run=args.dry_run,
+                _preloaded_data=single_data,
+            )
+            if result:
+                ok += 1
+            else:
+                fail += 1
+        print(f"\n{'='*60}")
+        print(f"  Batch complete: {ok} succeeded, {fail} failed out of {total}")
+        print(f"{'='*60}\n")
+        sys.exit(0 if fail == 0 else 1)
+
+    if len(local_files) == 1 and Path(local_files[0]).is_dir():
+        dir_path = Path(local_files[0])
+        tsx_files = sorted(dir_path.glob("*.tsx")) + sorted(dir_path.glob("*.jsx"))
+        if tsx_files:
+            has_page = any(f.stem.lower() in ("page", "index") for f in tsx_files)
+            if not has_page and len(tsx_files) > 1:
+                total = len(tsx_files)
+                ok = 0
+                fail = 0
+                for f in tsx_files:
+                    result = process_component(
+                        f.stem,
+                        style=args.style,
+                        output_dir=args.output,
+                        dry_run=args.dry_run,
+                        local_files=[str(f)],
+                    )
+                    if result:
+                        ok += 1
+                    else:
+                        fail += 1
+                print(f"\n{'='*60}")
+                print(f"  Batch complete: {ok} succeeded, {fail} failed out of {total}")
+                print(f"{'='*60}\n")
+                sys.exit(0 if fail == 0 else 1)
+
+    # Single block mode
+    success = process_component(
+        name,
+        style=args.style,
+        output_dir=args.output,
+        dry_run=args.dry_run,
+        local_files=local_files if local_files else None,
+        github_urls=github_urls if github_urls else None,
+    )
+
+    sys.exit(0 if success else 1)
+
+
+if __name__ == "__main__":
+    main()
